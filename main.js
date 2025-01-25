@@ -9,12 +9,13 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 768,
     webPreferences: {
-      nodeIntegration: true
+      nodeIntegration: true,
     },
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 10, y: 10 },
     vibrancy: 'ultra-dark',
-    visualEffectState: 'active'
+    visualEffectState: 'active',
+    icon: __dirname + '/assets/app-icon.ico', // Path to your app icon
   });
 
   mainWindow.loadFile('index.html');
