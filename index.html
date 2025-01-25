@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Electron Conversion App</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      font-family: Arial, sans-serif;
+    }
+
+    #sidebar {
+      width: 200px;
+      background: #333;
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #sidebar .menu-item {
+      padding: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+
+    #sidebar .menu-item:hover {
+      background: #444;
+    }
+
+    #sidebar .menu-item img {
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+    }
+
+    #content {
+      flex: 1;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <div class="menu-item" onclick="loadApp('Accounting')">
+      <img src="icons/accounting.png" alt="Accounting"> Accounting
+    </div>
+    <div class="menu-item" onclick="loadApp('Giving')">
+      <img src="icons/giving.png" alt="Giving"> Giving
+    </div>
+    <div class="menu-item" onclick="loadApp('Tithe.ly')">
+      <img src="icons/tithely.png" alt="Tithe.ly"> Tithe.ly
+    </div>
+    <div class="menu-item" onclick="loadApp('Hanacard')">
+      <img src="icons/hanacard.png" alt="Hanacard"> Hanacard
+    </div>
+  </div>
+  <div id="content">
+    <h1>Welcome to the Electron Conversion App</h1>
+    <p>Select a menu item to get started.</p>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    ipcRenderer.on('load-app', (event, appName) => {
+      document.getElementById('content').innerHTML = `<h1>${appName}</h1><p>Content for ${appName} goes here.</p>`;
+    });
+
+    function loadApp(appName) {
+      ipcRenderer.send('load-app', appName);
+    }
+  </script>
+</body>
+</html>
