@@ -34,6 +34,11 @@
       background: #444;
     }
 
+    #sidebar .menu-item.active {
+      background: #555;
+      font-weight: bold;
+    }
+
     #sidebar .menu-item i {
       margin-right: 10px;
     }
@@ -42,31 +47,52 @@
       flex: 1;
       padding: 20px;
     }
+
+    .drag-region {
+      -webkit-app-region: drag;
+      height: 40px;
+      background: transparent;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
+  <div class="drag-region"></div>
   <div id="sidebar">
-    <div class="menu-item" onclick="loadApp('Accounting')">
+    <div class="menu-item active" id="menu-accounting" onclick="loadApp('Accounting', this)">
       <i class="fas fa-calculator"></i> Accounting
     </div>
-    <div class="menu-item" onclick="loadApp('Giving')">
+    <div class="menu-item" id="menu-giving" onclick="loadApp('Giving', this)">
       <i class="fas fa-hand-holding-usd"></i> Giving
     </div>
-    <div class="menu-item" onclick="loadApp('Tithe.ly')">
+    <div class="menu-item" id="menu-tithely" onclick="loadApp('Tithe.ly', this)">
       <i class="fas fa-donate"></i> Tithe.ly
     </div>
-    <div class="menu-item" onclick="loadApp('Hanacard')">
+    <div class="menu-item" id="menu-hanacard" onclick="loadApp('Hanacard', this)">
       <i class="fas fa-credit-card"></i> Hanacard
     </div>
   </div>
   <div id="content">
-    <h1>Welcome to the Electron Conversion App</h1>
-    <p>Select a menu item to get started.</p>
+    <h1>Accounting</h1>
+    <p>Content for Accounting goes here.</p>
   </div>
   <script>
-    function loadApp(appName) {
+    function loadApp(appName, menuItem) {
+      // Update content
       document.getElementById('content').innerHTML = `<h1>${appName}</h1><p>Content for ${appName} goes here.</p>`;
+
+      // Highlight selected menu item
+      const menuItems = document.querySelectorAll('.menu-item');
+      menuItems.forEach(item => item.classList.remove('active'));
+      menuItem.classList.add('active');
     }
+
+    // Default to "Accounting"
+    document.getElementById('menu-accounting').click();
   </script>
 </body>
 </html>
