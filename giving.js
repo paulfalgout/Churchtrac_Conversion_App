@@ -1,33 +1,11 @@
-const converter = require('./converter');
-const writer = require('./writer');
-const path = require('path');
+// imports in accounting.js
 
-function addButton(text, handler) {
-  const button = document.createElement('button');
-  button.innerText = text;
-  button.style.padding = '2px 8px';
-  button.style.marginTop = '10px';
-  button.style.marginLeft = '5px';
-  button.addEventListener('click', handler);
-  return button;
-}
-
-const showButton = addButton('SHOW', () => {
-  const { shell } = require('@electron/remote');
-  shell.showItemInFolder(showButton.path);
-});
-
-const openButton = addButton('OPEN', () => {
-  const { shell } = require('@electron/remote');
-  shell.openPath(openButton.path);
-});
-
-function handleAcctFile(file) {
+function handleGivingFile(file) {
   if (file.name.endsWith('.txt')) {
     const reader = new FileReader();
     reader.onload = async(e) => {
-      const data = await converter.processFile(e.target.result);
-      const outputPath = await writer.writeFile('accounting', 'ofx', data);
+      const data = await converter.processGivingFile(e.target.result);
+      const outputPath = await writer.writeFile('giving', 'csv', data);
       const output = document.getElementById('output');
       output.innerHTML = `File written to: ${ path.basename(outputPath) } `;
       openButton.path = outputPath;
@@ -41,7 +19,7 @@ function handleAcctFile(file) {
   }
 }
 
-function attachAccoungingEventListeners() {
+function attachGivingEventListeners() {
   const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('file-input');
 
@@ -58,13 +36,13 @@ function attachAccoungingEventListeners() {
     e.preventDefault();
     dropZone.classList.remove('dragging');
     const file = e.dataTransfer.files[0];
-    if (file) handleAcctFile(file);
+    if (file) handleGivingFile(file);
   });
 
   dropZone.addEventListener('click', () => fileInput.click());
 
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
-    if (file) handleAcctFile(file);
+    if (file) handleGivingFile(file);
   });
 }
