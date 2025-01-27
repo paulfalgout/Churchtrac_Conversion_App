@@ -55,6 +55,7 @@ const menuTemplate = [
       { label: 'Giving', click: () => loadApp('Giving') },
       { label: 'Tithe.ly', click: () => loadApp('Tithe.ly') },
       { label: 'Hanacard', click: () => loadApp('Hanacard') },
+      { label: 'Settings', click: () => loadApp('Settings') },
     ],
   },
 ];

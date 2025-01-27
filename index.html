@@ -115,6 +115,27 @@
       overflow-x: auto;
       font-size: 0.9rem;
     }
+
+    .file-path {
+      color: #0aa3f4;
+      font-size: 1rem;
+      margin-top: 10px;
+    }
+
+    .button {
+      background-color: #0aa3f4;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.3s;
+    }
+
+    .button:hover {
+      background-color: #008ac7;
+    }
   </style>
 </head>
 <body>
@@ -131,6 +152,9 @@
     <div class="menu-item" id="menu-hanacard" onclick="loadApp('Hanacard', this)">
       <i class="fas fa-credit-card"></i> Hanacard
     </div>
+    <div class="menu-item" id="menu-settings" onclick="loadApp('Settings', this)">
+      <i class="fas fa-cog"></i> Settings
+    </div>
   </div>
   <div id="content">
     <div class="card">
@@ -141,6 +165,8 @@
       <pre id="output">Waiting for file...</pre>
     </div>
   </div>
-  <script src="renderer.js"></script>
+  <script src="accounting.js"></script>
+  <script src="settings.js"></script>
+  <script src="apps.js"></script>
 </body>
 </html>

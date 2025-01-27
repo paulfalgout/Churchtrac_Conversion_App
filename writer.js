@@ -1,7 +1,9 @@
-
 const fs = require('fs');
-function writeFile(outputPath, data) {
-  fs.writeFileSync(outputPath, data, { encoding: 'utf8' });
+const savedPath = localStorage.getItem('defaultPath') || './';
+const today = new Date();
+fileTimeStamp = today.toISOString().substring(0, 10);
+function writeFile(fileName, fileType, data) {
+  fs.writeFileSync(`${ savedPath }${ fileName }-${ fileTimeStamp }.${ fileType }`, data, { encoding: 'utf8' });
   return outputPath;
 }
 
