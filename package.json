@@ -7,9 +7,10 @@
     "start": "electron .",
     "package": "electron-packager . ConversionApp --platform=darwin,win32 --arch=x64 --out=dist --icon=assets/app-icon"
   },
-  "dependencies": {},
   "devDependencies": {
+    "@electron/remote": "^2.1.2",
     "electron": "^24.0.0",
-    "electron-packager": "^17.1.1"
+    "electron-packager": "^17.1.1",
+    "electron-store": "~8.0.0"
   }
 }

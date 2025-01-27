@@ -1,9 +1,11 @@
 
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
-const path = require('path');
-const converter = require('./converter');
-const writer = require('./writer');
+const { app, BrowserWindow, Menu } = require('electron');
+
 let mainWindow;
+
+const Store = require('electron-store');
+
+Store.initRenderer();
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -13,8 +15,8 @@ function createWindow() {
     minHeight: 768,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: true, // Allow ipcRenderer
-      preload: path.join(__dirname, 'preload.js')
+      contextIsolation: false,
+      enableRemoteModule: true,
     },
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 10, y: 10 },
@@ -22,6 +24,8 @@ function createWindow() {
     visualEffectState: 'active',
     icon: __dirname + '/assets/app-icon.ico',
   });
+
+  require("@electron/remote/main").enable(mainWindow.webContents)
 
   mainWindow.loadFile('index.html');
 
@@ -69,6 +73,8 @@ function loadApp(appName) {
 }
 
 app.on('ready', () => {
+  require('@electron/remote/main').initialize();
+
   const menu = Menu.buildFromTemplate(menuTemplate);
   Menu.setApplicationMenu(menu);
   createWindow();
@@ -86,20 +92,10 @@ app.on('activate', () => {
   }
 });
 
-ipcMain.handle('process-file', async (event, filePath, fileType) => {
-  const outputPath = await converter.processFile(filePath, fileType);
-  return outputPath;
-});
+// ipcMain.handle('open-file', async (event, filePath, fileType) => {
+//   shell.openPath(filePath);
+// });
 
-ipcMain.handle('write-file', async (event, filePath, data) => {
-  const outputPath = await writer.writeFile(filePath, data);
-  return outputPath;
-});
-
-ipcMain.handle('open-file', async (event, filePath, fileType) => {
-  shell.openPath(filePath);
-});
-
-ipcMain.handle('show-file', async (event, filePath, fileType) => {
-  shell.showItemInFolder(filePath);
-});
+// ipcMain.handle('show-file', async (event, filePath, fileType) => {
+//   shell.showItemInFolder(filePath);
+// });

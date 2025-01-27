@@ -1,11 +1,37 @@
+const converter = require('./converter');
+const writer = require('./writer');
+const { shell } = require('@electron/remote');
+const path = require('path');
+
+let outputPath;
+function addButton(text, handler) {
+  const button = document.createElement('button');
+  button.innerText = text;
+  button.style.padding = '2px 8px';
+  button.style.marginTop = '10px';
+  button.style.marginLeft = '5px';
+  button.addEventListener('click', handler);
+  return button;
+}
+
+const showButton = addButton('SHOW', () => {
+  shell.showItemInFolder(outputPath);
+});
+
+const openButton = addButton('OPEN', () => {
+  shell.openPath(outputPath);
+});
+
 function handleAcctFile(file) {
   if (file.name.endsWith('.txt')) {
     const reader = new FileReader();
     reader.onload = async(e) => {
-      const data = await window.electronAPI.processFile(e.target.result);
-      const outputPath = await window.electronAPI.writeFile('accounting', 'ofx', data);
+      const data = await converter.processFile(e.target.result);
+      outputPath = await writer.writeFile('accounting', 'ofx', data);
       const output = document.getElementById('output');
-      output.innerHTML = `File written to: <a href="#" onclick="window.electronAPI.showFile('${outputPath}')">${outputPath}</a>`;
+      output.innerHTML = `File written to: ${ path.basename(outputPath) } `;
+      output.appendChild(openButton);
+      output.appendChild(showButton);
     }
     reader.readAsText(file);
   } else {

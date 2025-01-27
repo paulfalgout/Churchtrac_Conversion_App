@@ -1,9 +1,14 @@
 const fs = require('fs');
-const savedPath = localStorage.getItem('defaultPath') || './';
+const path = require('path');
+const Store = require('electron-store');
+const store = new Store();
+
 const today = new Date();
 fileTimeStamp = today.toISOString().substring(0, 10);
 function writeFile(fileName, fileType, data) {
-  fs.writeFileSync(`${ savedPath }${ fileName }-${ fileTimeStamp }.${ fileType }`, data, { encoding: 'utf8' });
+  const savedPath = store.get('defaultPath') || './';
+  const outputPath = path.join(savedPath, `${ fileName }-${ fileTimeStamp }.${ fileType }`);
+  fs.writeFileSync(outputPath, data, { encoding: 'utf8' });
   return outputPath;
 }
 
