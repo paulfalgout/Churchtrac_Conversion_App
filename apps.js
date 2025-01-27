@@ -23,6 +23,25 @@ function loadApp(appName, menuItem) {
         <pre id="output">Waiting for file...</pre>
       </div>`;
     attachGivingEventListeners();
+  } else if (appName === 'Tithe.ly') {
+    document.getElementById('content').innerHTML = `
+      <div class="card">
+        <h1>${appName}</h1>
+
+        <section id="exchange-rate" style="margin-bottom: 20px;">
+          <h2>Exchange Rate</h2>
+          <p>Current Rate: <span id="current-rate">Loading...</span> (Last updated: <span id="last-updated">Loading...</span>)</p>
+          <p><button id="refresh-rate">Refresh Rate</button></p>
+          <p><label for="manual-rate">Set Rate Manually:</label>
+          <input type="number" id="manual-rate" placeholder="Enter rate"></p>
+        </section>
+
+        <p>Drag and drop a file or select one to get started.</p>
+        <div class="drop-zone" id="drop-zone">Drag and drop a .csv file here or click to upload</div>
+        <input type="file" id="file-input" accept=".csv" style="display: none;">
+        <pre id="output">Waiting for file...</pre>
+      </div>`;
+    attachExchangeEventListeners();
   } else if (appName === 'Settings') {
     document.getElementById('content').innerHTML = `
       <div class="card">
