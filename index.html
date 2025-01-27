@@ -9,18 +9,21 @@
     body {
       margin: 0;
       display: flex;
-      font-family: Arial, sans-serif;
+      font-family: 'Arial', sans-serif;
+      background: #121212;
+      color: #eee;
     }
 
     #sidebar {
       width: 200px;
-      background: #333;
+      background: #1e1e1e;
       color: #fff;
       height: 100vh;
       display: flex;
       flex-direction: column;
-      padding-top: 40px; /* Avoid overlap with close/minimize buttons */
+      padding-top: 40px;
       box-sizing: border-box;
+      border-right: 2px solid #444;
     }
 
     #sidebar .menu-item {
@@ -28,14 +31,19 @@
       cursor: pointer;
       display: flex;
       align-items: center;
+      transition: background 0.3s, color 0.3s;
+      font-size: 1rem;
+      text-transform: uppercase;
     }
 
     #sidebar .menu-item:hover {
       background: #444;
+      color: #fff;
     }
 
     #sidebar .menu-item.active {
       background: #555;
+      color: #0aa3f4;
       font-weight: bold;
     }
 
@@ -45,23 +53,71 @@
 
     #content {
       flex: 1;
-      padding: 20px;
+      padding: 50px;
+      background: #202020;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
     }
 
-    .drag-region {
-      -webkit-app-region: drag;
-      height: 40px;
+    .card {
+      background: #121212;
+      border: 4px solid #0aa3f4;
+      color: #eee;
+      padding: 30px;
+      text-align: center;
+      width: 80%;
+      max-width: 600px;
+      margin-bottom: 30px;
+      box-shadow: 10px 10px 0 #0aa3f4, -10px -10px 0 #444;
+      position: relative;
+    }
+
+    .card h1 {
+      font-size: 2.5rem;
+      margin: 0 0 10px;
+      color: #fff;
+      letter-spacing: 2px;
+    }
+
+    .card p {
+      font-size: 1.2rem;
+      line-height: 1.8;
+      color: #ccc;
+      margin: 0 0 20px;
+    }
+
+    .drop-zone {
       background: transparent;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      z-index: 10;
+      border: 2px dashed #555;
+      border-radius: 10px;
+      padding: 20px;
+      color: #999;
+      text-align: center;
+      font-size: 1rem;
+      transition: background 0.3s, border-color 0.3s;
+      cursor: pointer;
+    }
+
+    .drop-zone.dragging {
+      border-color: #0aa3f4;
+      background-color: #292929;
+    }
+
+    pre {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 5px;
+      color: #00ff00;
+      max-width: 100%;
+      overflow-x: auto;
+      font-size: 0.9rem;
     }
   </style>
 </head>
 <body>
-  <div class="drag-region"></div>
   <div id="sidebar">
     <div class="menu-item active" id="menu-accounting" onclick="loadApp('Accounting', this)">
       <i class="fas fa-calculator"></i> Accounting
@@ -77,22 +133,14 @@
     </div>
   </div>
   <div id="content">
-    <h1>Accounting</h1>
-    <p>Content for Accounting goes here.</p>
+    <div class="card">
+      <h1>Welcome to Accounting</h1>
+      <p>Drag and drop a file or select one to get started.</p>
+      <div class="drop-zone" id="drop-zone">Drag and drop a .txt file here or click to upload</div>
+      <input type="file" id="file-input" accept=".txt" style="display: none;">
+      <pre id="output">Waiting for file...</pre>
+    </div>
   </div>
-  <script>
-    function loadApp(appName, menuItem) {
-      // Update content
-      document.getElementById('content').innerHTML = `<h1>${appName}</h1><p>Content for ${appName} goes here.</p>`;
-
-      // Highlight selected menu item
-      const menuItems = document.querySelectorAll('.menu-item');
-      menuItems.forEach(item => item.classList.remove('active'));
-      menuItem.classList.add('active');
-    }
-
-    // Default to "Accounting"
-    document.getElementById('menu-accounting').click();
-  </script>
+  <script src="renderer.js"></script>
 </body>
 </html>
