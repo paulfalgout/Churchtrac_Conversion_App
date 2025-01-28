@@ -41,8 +41,10 @@ const modifyCSVAmounts = (csvString, conversionRate) => {
   const modifiedDataRows = dataRows.map((row) => {
     const columns = splitCSVRow(row);
 
+    const allowedStatuses = ['succeeded', 'pending'];
+
       // Filter out rows where 'Status' is not 'succeeded', if the 'Status' column exists
-      if (statusIndex !== -1 && columns[statusIndex]?.trim().toLowerCase() !== 'succeeded') {
+      if (statusIndex !== -1 && !allowedStatuses.includes(columns[statusIndex]?.trim().toLowerCase())) {
         return null;
       }
 
