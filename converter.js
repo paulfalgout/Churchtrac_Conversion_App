@@ -1,4 +1,3 @@
-
 function parseCSV(data) {
   const rows = data.split('\n');
   const keys = rows[0]?.split('|').map((key) => key.trim()) || [];
@@ -11,26 +10,21 @@ function parseCSV(data) {
 }
 
 function convertToOFX(transactions) {
-const ofxHeader = `OFXHEADER:100
-DATA:OFXSGML
-VERSION:102
-SECURITY:NONE
-ENCODING:UTF-8
-CHARSET:UTF-8
-COMPRESSION:NONE
-OLDFILEUID:NONE
-NEWFILEUID:NONE
-
+const ofxHeader = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?OFX OFXHEADER="200" VERSION="211" SECURITY="NONE">
 <OFX>
 <BANKMSGSRSV1>
   <STMTTRNRS>
-    <TRNUID>1
+    <TRNUID>1</TRNUID>
     <STATUS>
-      <CODE>0
-      <SEVERITY>INFO
+      <CODE>0</CODE>
+      <SEVERITY>INFO</SEVERITY>
     </STATUS>
     <STMTRS>
-      <CURDEF>USD
+      <CURDEF>USD</CURDEF>
+      <BANKACCTFROM>
+        <ACCTID>174-890020-19904</ACCTID>
+      </BANKACCTFROM>
       <BANKTRANLIST>
 `;
 
@@ -42,18 +36,27 @@ const ofxFooter = `
 </OFX>
 `;
 
+const escapeXml = (unsafe) => {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+};
+
 const ofxTransactions = transactions.map((transaction) => {
   const type = transaction.Deposit ? "CREDIT" : "DEBIT";
-  const amount = transaction.Deposit || transaction.Withdraw;
-  const date = transaction["Transaction Date & Time"].replace(/[-:\s]/g, "").slice(0, 14); // Convert to YYYYMMDDHHMMSS
+  const amount = Number(transaction.Deposit.replace(/,/g, '')) || -Number(transaction.Withdraw.replace(/,/g, ''));
+  const date = transaction["Transaction Date & Time"].replace(/[-:\s]/g, "").slice(0, 8); // Convert to YYYYMMDD
 
   return `          <STMTTRN>
-          <TRNTYPE>${type}
-          <DTPOSTED>${date}
-          <TRNAMT>${amount.replace(/,/g, "")}
-          <FITID>${transaction.No}
-          <NAME>${transaction["Applicant/Beneficiary"] || ""}
-          <MEMO>${transaction["Remarks"] || ""} ${transaction["Type"] || ""} ${transaction["Branch"] || ""} ${transaction["Transaction Remarks"] || ""}
+          <TRNTYPE>${type}</TRNTYPE>
+          <DTPOSTED>${date}</DTPOSTED>
+          <TRNAMT>${amount}</TRNAMT>
+          <FITID>${date}${transaction.No}</FITID>
+          <NAME>${escapeXml(transaction["Applicant/Beneficiary"] || "Unknown")}</NAME>
+          <MEMO>${escapeXml(transaction["Remarks"] || "")} ${escapeXml(transaction["Type"] || "")} ${escapeXml(transaction["Branch"] || "")} ${escapeXml(transaction["Transaction Remarks"] || "")}</MEMO>
         </STMTTRN>`;
 });
 
