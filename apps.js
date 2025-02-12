@@ -1,3 +1,4 @@
+const { clipboard } = require('electron');
 function loadApp(appName, menuItem) {
   const menuItems = document.querySelectorAll('.menu-item');
   menuItems.forEach(item => item.classList.remove('active'));
@@ -57,9 +58,13 @@ function loadApp(appName, menuItem) {
       <h1>${appName}</h1>
       <p>For now manually input the items from the email</p>
       <p>Use this value to decode the email</p>
-      <p><input readonly type="text" value="1068264439"></p>
+      <p><input id="copyInput" readonly type="text" value="1068264439"></p>
       <p>Make sure to input a separate item for USD fees</p>
     </div>`;
+    const copyInput = document.getElementById('copyInput');
+    copyInput.addEventListener('click', () => {
+      clipboard.writeText(copyInput.value);
+    });
   } else {
     document.getElementById('content').innerHTML = `<div class="card"><h1>${appName}</h1><p>Content for ${appName} goes here.</p></div>`;
   }
