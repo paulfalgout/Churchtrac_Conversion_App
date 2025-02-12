@@ -1,3 +1,25 @@
+function parseCSVLine(line) {
+  const result = [];
+  let current = "";
+  let insideQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (char === '"' && (i === 0 || line[i - 1] !== "\\")) {
+          insideQuotes = !insideQuotes; // Toggle insideQuotes state
+      } else if (char === "," && !insideQuotes) {
+          result.push(current.trim());
+          current = "";
+      } else {
+          current += char;
+      }
+  }
+
+  result.push(current.trim()); // Push last column
+  return result;
+}
+
 function parseCSV(data) {
   const rows = data.split('\n');
   const keys = rows[0]?.split('|').map((key) => key.trim()) || [];
@@ -74,7 +96,9 @@ const escapeCSVValue = (value) => {
   return value;
 };
 
-const { v4: uuidv4 } = require('uuid'); // Import UUID library
+const namespace = 'd55c9ce1-da8f-4f8f-ab97-9f8e12c63857';
+
+const { v5: uuidv5 } = require('uuid'); // Import UUID library
 
 const processGivingFile = (data) => {
   const transactions = parseCSV(data);
@@ -99,7 +123,7 @@ const processGivingFile = (data) => {
     const name = item['Applicant/Beneficiary'] || '';
 
     return [
-      uuidv4(), // Column A: Unique identifier (UUID)
+      uuidv5(name, namespace), // Column A: Unique identifier (UUID)
       escapeCSVValue(deposit), // Column B: Amount
       'General Offerings',
       'yes', // Column D: Tax Deductible
@@ -114,4 +138,73 @@ const processGivingFile = (data) => {
   return [headers, ...rows].map((row) => row.join(',')).join('\n');
 };
 
-module.exports = { processFile, processGivingFile };
+const allowedStatuses = ['succeeded', 'pending'];
+
+function parseTithely(csvString, conversionRate) {
+    const lines = csvString.split("\n").map(line => line.trim()).filter(line => line);
+    const headers = lines.shift().split(",").map(h => h.replace(/"/g, '').trim()); // Remove quotes and trim spaces
+
+    const requiredFields = {
+        "Email": null,
+        "Amount": null,
+        "Transaction Date": null,
+        "Status": null,
+        "First Name": null,
+        "Last Name": null,
+        "Memo": null
+    };
+
+    // Map column indexes dynamically
+    headers.forEach((header, index) => {
+        if (Object.prototype.hasOwnProperty.call(requiredFields, header)) {
+            requiredFields[header] = index;
+        }
+    });
+
+    // Ensure required fields exist
+    if (Object.values(requiredFields).some(index => index === null)) {
+        console.error("Missing required fields in CSV.");
+        return [];
+    }
+
+    let output = [
+      "Email/Member Number,Amount,Category,Tax Deductible,Memo,Date,Contribution Type,First Name,Last Name"
+  ];
+
+  lines.forEach(line => {
+      const cols = parseCSVLine(line).map(col => col.replace(/"/g, '').trim()); // Remove quotes and trim spaces
+      const status = cols[requiredFields["Status"]];
+
+      if (!allowedStatuses.includes(status)) return; // Skip rows with unallowed statuses
+
+      let amount = parseFloat(cols[requiredFields["Amount"]].replace(/,/g, "")); // Remove commas in numbers
+      if (!isNaN(amount)) {
+        amount = Math.round(amount * conversionRate).toString(); // Apply conversion rate
+      } else {
+        console.log('ERROR', amount);
+      }
+
+      // Convert transaction date format
+      const dateParts = cols[requiredFields["Transaction Date"]].split(".");
+      const formattedDate = `20${dateParts[0].trim()}-${dateParts[1].trim().padStart(2, '0')}-${dateParts[2].trim().padStart(2, '0')}`;
+
+      const row = [
+          escapeCSVValue(cols[requiredFields["Email"]]), // Email/Member Number
+          escapeCSVValue(amount), // Amount in cents
+          "General Offerings", // Category
+          "no", // Tax Deductible
+          escapeCSVValue(cols[requiredFields["Memo"]] || ""), // Memo
+          escapeCSVValue(formattedDate), // Date
+          "Card", // Contribution Type
+          escapeCSVValue(cols[requiredFields["First Name"]]), // First Name
+          escapeCSVValue(cols[requiredFields["Last Name"]]), // Last Name
+      ].join(",");
+
+      output.push(row);
+  });
+
+  return output.join("\n");
+}
+
+module.exports = { processFile, processGivingFile, parseTithely };
+
