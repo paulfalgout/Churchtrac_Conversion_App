@@ -20,10 +20,13 @@ function parseCSVLine(line) {
   return result;
 }
 
+// Allows for Korean and English.  Assumes set columns
+const firstRow = 'No|Transaction Date & Time|Remarks|Applicant/Beneficiary|Deposit|Withdraw|Post-Transaction Balance|Type|Branch|Transaction Remarks';
+
 function parseCSV(data) {
   const rows = data.split('\n');
-  const keys = rows[0]?.split('|').map((key) => key.trim()) || [];
-  return  rows.slice(1)
+  const keys = firstRow?.split('|').map((key) => key.trim()) || [];
+  return  rows.slice(1, -1)
     .filter((row) => !row.includes('Sum Total') && row.trim())
     .map((row) => row.split('|').reduce((acc, value, index) => {
       acc[keys[index]] = value.trim();
