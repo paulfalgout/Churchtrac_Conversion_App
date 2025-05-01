@@ -24,7 +24,7 @@ function parseCSVLine(line) {
 const firstRow = 'No|Transaction Date & Time|Remarks|Applicant/Beneficiary|Deposit|Withdraw|Post-Transaction Balance|Type|Branch|Transaction Remarks';
 
 function parseCSV(data) {
-  const rows = data.split('\n');
+  const rows = data.split(/\r?\n/);
   const keys = firstRow?.split('|').map((key) => key.trim()) || [];
   return  rows.slice(1, -1)
     .filter((row) => !row.includes('Sum Total') && row.trim())
