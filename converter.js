@@ -124,9 +124,10 @@ const processGivingFile = (data) => {
     if (deposit === 0) return null;
 
     const name = item['Applicant/Beneficiary'] || '';
+    const id = name.includes('(주)') ? 'no-id' : uuidv5(name, namespace).replace(/-/g, '').slice(0, 10);
 
     return [
-      uuidv5(name, namespace), // Column A: Unique identifier (UUID)
+      id, // Column A: Unique identifier (UUID)
       escapeCSVValue(deposit), // Column B: Amount
       'General Offerings',
       'yes', // Column D: Tax Deductible
