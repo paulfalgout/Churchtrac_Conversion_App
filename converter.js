@@ -20,18 +20,39 @@ function parseCSVLine(line) {
   return result;
 }
 
-// Allows for Korean and English.  Assumes set columns
-const firstRow = 'No|Transaction Date & Time|Remarks|Applicant/Beneficiary|Deposit|Withdraw|Post-Transaction Balance|Type|Branch|Transaction Remarks';
+// New Hana bank layout (Korean headers) as of 2026 exports.
+const expectedNewLayoutHeaders = ['No', '거래일시', '적요', '추가메모', '의뢰인/수취인', '입금', '출금', '거래후잔액', '구분', '거래점', '거래특이사항'];
 
 function parseCSV(data) {
-  const rows = data.split(/\r?\n/);
-  const keys = firstRow?.split('|').map((key) => key.trim()) || [];
-  return  rows.slice(1, -1)
-    .filter((row) => !row.includes('Sum Total') && row.trim())
-    .map((row) => row.split('|').reduce((acc, value, index) => {
-      acc[keys[index]] = value.trim();
-      return acc;
-    }, {}));
+  const rows = data.split(/\r?\n/).filter((row) => row.trim());
+  if (rows.length < 2) return [];
+
+  const headers = rows[0].split('|').map((value) => value.trim());
+  const hasExpectedLayout = expectedNewLayoutHeaders.every((header, index) => headers[index] === header);
+  if (!hasExpectedLayout) {
+    throw new Error('Unsupported file layout. Please export the latest Korean Hana transaction format.');
+  }
+
+  return rows
+    .slice(1)
+    .map((row) => row.split('|').map((value) => value.trim()))
+    .filter((cols) => {
+      const normalizedMarker = (cols[1] || '').replace(/\s+/g, '');
+      return normalizedMarker !== '합계';
+    })
+    .map((cols) => ({
+      No: cols[0] || '',
+      'Transaction Date & Time': cols[1] || '',
+      Remarks: cols[2] || '',
+      'Additional Memo': cols[3] || '',
+      'Applicant/Beneficiary': cols[4] || '',
+      Deposit: cols[5] || '',
+      Withdraw: cols[6] || '',
+      'Post-Transaction Balance': cols[7] || '',
+      Type: cols[8] || '',
+      Branch: cols[9] || '',
+      'Transaction Remarks': cols[10] || ''
+    }));
 }
 
 function convertToOFX(transactions) {
@@ -118,24 +139,27 @@ const processGivingFile = (data) => {
   ];
 
   const rows = transactions.map((item) => {
-    const deposit = item.Deposit ? parseInt(item.Deposit.replace(/,/g, '')) : 0;
+    const rawDeposit = (item.Deposit || '').replace(/,/g, '').trim();
+    const deposit = Number(rawDeposit);
 
-    // Skip rows with no deposit amount
-    if (deposit === 0) return null;
+    // Skip rows with invalid or non-positive deposits.
+    if (!Number.isFinite(deposit) || deposit <= 0) return null;
 
-    const name = item['Applicant/Beneficiary'] || '';
-    const id = name.includes('(주)') ? 'no-id' : uuidv5(name, namespace).replace(/-/g, '').slice(0, 10);
+    const name = (item['Applicant/Beneficiary'] || item.Remarks || '').trim();
+    const id = (!name || name.includes('(주)')) ? 'no-id' : uuidv5(name, namespace).replace(/-/g, '').slice(0, 10);
+    const nameParts = name.split(/\s+/).filter(Boolean);
+    const memo = [item.Remarks, item['Additional Memo']].filter(Boolean).join(' ').trim().slice(0, 64);
 
     return [
       id, // Column A: Unique identifier (UUID)
       escapeCSVValue(deposit), // Column B: Amount
       'General Offerings',
       'yes', // Column D: Tax Deductible
-      escapeCSVValue(item.Remarks.substring(0, 64) || ''), // Column E: Memo (trimmed to 64 characters)
+      escapeCSVValue(memo), // Column E: Memo (trimmed to 64 characters)
       escapeCSVValue(item['Transaction Date & Time']), // Column F: Date
       'ACH', // Column G: Contribution Type
-      escapeCSVValue(name.split(' ')[1] ? name.split(' ')[1] : ''),
-      escapeCSVValue(name.split(' ')[0]),
+      escapeCSVValue(nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''),
+      escapeCSVValue(nameParts[0] || ''),
     ];
   }).filter(Boolean); // Remove null rows
 
@@ -211,4 +235,3 @@ function parseTithely(csvString, conversionRate) {
 }
 
 module.exports = { processFile, processGivingFile, parseTithely };
-

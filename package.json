@@ -6,7 +6,8 @@
   "scripts": {
     "start": "electron .",
     "package": "electron-packager . ConversionApp --platform=darwin,win32 --arch=x64 --out=dist --icon=assets/app-icon",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "dist:win": "electron-builder --win --x64"
   },
   "dependencies": {
     "@electron/remote": "^2.1.2",
@@ -37,8 +38,26 @@
       "icon": "assets/app-icon.icns"
     },
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/app-icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }

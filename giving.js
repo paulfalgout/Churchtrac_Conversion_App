@@ -4,14 +4,18 @@ function handleGivingFile(file) {
   if (file.name.endsWith('.txt')) {
     const reader = new FileReader();
     reader.onload = async(e) => {
-      const data = await converter.processGivingFile(e.target.result);
-      const outputPath = await writer.writeFile('giving', 'csv', data);
-      const output = document.getElementById('output');
-      output.innerHTML = `File written to: ${ path.basename(outputPath) } `;
-      openButton.path = outputPath;
-      showButton.path = outputPath;
-      output.appendChild(openButton);
-      output.appendChild(showButton);
+      try {
+        const data = await converter.processGivingFile(e.target.result);
+        const outputPath = await writer.writeFile('giving', 'csv', data);
+        const output = document.getElementById('output');
+        output.innerHTML = `File written to: ${ path.basename(outputPath) } `;
+        openButton.path = outputPath;
+        showButton.path = outputPath;
+        output.appendChild(openButton);
+        output.appendChild(showButton);
+      } catch (error) {
+        alert(error.message || 'Failed to process giving file.');
+      }
     }
     reader.readAsText(file);
   } else {
