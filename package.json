@@ -7,7 +7,7 @@
     "start": "electron .",
     "package": "electron-packager . ConversionApp --platform=darwin,win32 --arch=x64 --out=dist --icon=assets/app-icon",
     "build": "electron-builder",
-    "dist:win": "electron-builder --win nsis portable --x64"
+    "dist:win": "electron-builder --win --x64"
   },
   "dependencies": {
     "@electron/remote": "^2.1.2",

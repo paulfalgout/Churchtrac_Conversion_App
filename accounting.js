@@ -26,14 +26,18 @@ function handleAcctFile(file) {
   if (file.name.endsWith('.txt')) {
     const reader = new FileReader();
     reader.onload = async(e) => {
-      const data = await converter.processFile(e.target.result);
-      const outputPath = await writer.writeFile('accounting', 'ofx', data);
-      const output = document.getElementById('output');
-      output.innerHTML = `File written to: ${ path.basename(outputPath) } `;
-      openButton.path = outputPath;
-      showButton.path = outputPath;
-      output.appendChild(openButton);
-      output.appendChild(showButton);
+      try {
+        const data = await converter.processFile(e.target.result);
+        const outputPath = await writer.writeFile('accounting', 'ofx', data);
+        const output = document.getElementById('output');
+        output.innerHTML = `File written to: ${ path.basename(outputPath) } `;
+        openButton.path = outputPath;
+        showButton.path = outputPath;
+        output.appendChild(openButton);
+        output.appendChild(showButton);
+      } catch (error) {
+        alert(error.message || 'Failed to process accounting file.');
+      }
     }
     reader.readAsText(file);
   } else {

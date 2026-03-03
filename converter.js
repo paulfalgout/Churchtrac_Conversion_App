@@ -36,7 +36,10 @@ function parseCSV(data) {
   return rows
     .slice(1)
     .map((row) => row.split('|').map((value) => value.trim()))
-    .filter((cols) => cols[1] !== '합   계')
+    .filter((cols) => {
+      const normalizedMarker = (cols[1] || '').replace(/\s+/g, '');
+      return normalizedMarker !== '합계';
+    })
     .map((cols) => ({
       No: cols[0] || '',
       'Transaction Date & Time': cols[1] || '',
