@@ -28,6 +28,7 @@
     "files": [
       "main.js",
       "index.html",
+      "styles.css",
       "assets/**/*",
       "node_modules/**/*",
       "package.json",

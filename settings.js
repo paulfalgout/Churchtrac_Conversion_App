@@ -1,29 +1,37 @@
-const Store = require('electron-store');
-const { dialog } = require('@electron/remote');
-const store = new Store();
+const SettingsStore = require('electron-store');
+const { dialog: settingsDialog } = require('@electron/remote');
+
+const settingsStore = new SettingsStore();
+
+function renderDefaultPath(selectedPath) {
+  const defaultPathElement = document.getElementById('default-path');
+  if (!defaultPathElement) return;
+
+  defaultPathElement.textContent = selectedPath || 'No default path selected.';
+}
 
 function attachSettingsEventListeners() {
   const choosePathButton = document.getElementById('choose-path');
-  const defaultPathElement = document.getElementById('default-path');
+
+  renderDefaultPath(settingsStore.get('defaultPath'));
 
   choosePathButton?.addEventListener('click', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog({
+    const { canceled, filePaths } = await settingsDialog.showOpenDialog({
       properties: ['openDirectory']
     });
-    if (!canceled && filePaths.length > 0) {
-      let selectedPath = filePaths[0];
-      if (!selectedPath.endsWith('/')) {
-        selectedPath += '/'; // Add a trailing slash if it's missing
-      }
-      store.set('defaultPath', selectedPath);
-      defaultPathElement.textContent = `Default Path: ${selectedPath}`;
+
+    if (canceled || filePaths.length === 0) {
+      setWorkspaceStatus('Folder selection cancelled', 'ready');
+      return;
     }
+
+    let selectedPath = filePaths[0];
+    if (!selectedPath.endsWith('/')) {
+      selectedPath += '/';
+    }
+
+    settingsStore.set('defaultPath', selectedPath);
+    renderDefaultPath(selectedPath);
+    setWorkspaceStatus('Output folder updated', 'success');
   });
-
-  const savedPath = store.get('defaultPath');
-  if (savedPath) {
-    defaultPathElement.textContent = `Default Path: ${savedPath}`;
-  }
 }
-
-

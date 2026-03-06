@@ -1,52 +1,40 @@
-// imports in accounting.js
+const givingConverter = require('./converter');
+const givingWriter = require('./writer');
+const givingPath = require('path');
 
 function handleGivingFile(file) {
-  if (file.name.endsWith('.txt')) {
-    const reader = new FileReader();
-    reader.onload = async(e) => {
-      try {
-        const data = await converter.processGivingFile(e.target.result);
-        const outputPath = await writer.writeFile('giving', 'csv', data);
-        const output = document.getElementById('output');
-        output.innerHTML = `File written to: ${ path.basename(outputPath) } `;
-        openButton.path = outputPath;
-        showButton.path = outputPath;
-        output.appendChild(openButton);
-        output.appendChild(showButton);
-      } catch (error) {
-        alert(error.message || 'Failed to process giving file.');
-      }
-    }
-    reader.readAsText(file);
-  } else {
-    alert('Please upload a .txt file.');
+  if (!file.name.endsWith('.txt')) {
+    setErrorState('Unsupported giving file', 'Upload a HanaBank text export ending in .txt.');
+    return;
   }
+
+  const reader = new FileReader();
+  setProcessingState('Processing giving export', `Reading ${file.name} and preparing ChurchTrac CSV output.`);
+
+  reader.onload = async(event) => {
+    try {
+      const data = await givingConverter.processGivingFile(event.target.result);
+      const outputPath = await givingWriter.writeFile('giving', 'csv', data);
+
+      setSuccessState({
+        title: 'Giving CSV generated',
+        detail: `Saved ${givingPath.basename(outputPath)} from ${file.name}.`,
+        outputPath,
+        pills: [
+          { label: 'ChurchTrac import', icon: 'fa-table' },
+          { label: 'Deposits only', icon: 'fa-filter' }
+        ]
+      });
+    } catch (error) {
+      setErrorState('Giving conversion failed', error.message || 'Failed to process giving file.');
+    }
+  };
+
+  reader.readAsText(file);
 }
 
 function attachGivingEventListeners() {
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input');
-
-  dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('dragging');
-  });
-
-  dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragging');
-  });
-
-  dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('dragging');
-    const file = e.dataTransfer.files[0];
-    if (file) handleGivingFile(file);
-  });
-
-  dropZone.addEventListener('click', () => fileInput.click());
-
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) handleGivingFile(file);
+  bindFileDropZone({
+    onFile: handleGivingFile
   });
 }
