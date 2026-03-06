@@ -97,49 +97,53 @@ function parseCSV(data) {
 }
 
 function convertToOFX(transactions) {
-const normalizedTransactions = transactions
-  .map((transaction, index) => {
-    const deposit = parseAmount(transaction.Deposit);
-    const withdraw = parseAmount(transaction.Withdraw);
-    const postedAt = normalizeDateTime(transaction['Transaction Date & Time']);
-    const amount = deposit > 0 ? deposit : -withdraw;
+  const normalizedTransactions = transactions
+    .map((transaction, index) => {
+      const deposit = parseAmount(transaction.Deposit);
+      const withdraw = parseAmount(transaction.Withdraw);
+      const postedAt = normalizeDateTime(transaction['Transaction Date & Time']);
+      const amount = deposit > 0 ? deposit : -withdraw;
 
-    if (!postedAt || amount === 0) return null;
+      if (!postedAt || amount === 0) return null;
 
-    return {
-      ...transaction,
-      amount,
-      postedAt,
-      name: joinUniqueParts([
-        transaction['Applicant/Beneficiary'],
-        transaction.Remarks,
-        transaction['Additional Memo']
-      ]) || 'Hana transaction',
-      memo: joinUniqueParts([
-        transaction.Remarks,
-        transaction['Additional Memo'],
-        transaction['Applicant/Beneficiary'],
-        transaction.Type,
-        transaction.Branch,
-        transaction['Transaction Remarks']
-      ]),
-      fitId: joinUniqueParts([
+      return {
+        ...transaction,
+        amount,
         postedAt,
-        transaction.No,
-        String(index + 1)
-      ]).replace(/\s+/g, '-')
-    };
-  })
-  .filter(Boolean)
-  .sort((left, right) => left.postedAt.localeCompare(right.postedAt));
+        name: joinUniqueParts([
+          transaction['Applicant/Beneficiary'],
+          transaction.Remarks,
+          transaction['Additional Memo']
+        ]) || 'Hana transaction',
+        memo: joinUniqueParts([
+          transaction.Remarks,
+          transaction['Additional Memo'],
+          transaction['Applicant/Beneficiary'],
+          transaction.Type,
+          transaction.Branch,
+          transaction['Transaction Remarks']
+        ]),
+        fitId: joinUniqueParts([
+          postedAt,
+          transaction.No,
+          String(index + 1)
+        ]).replace(/\s+/g, '-')
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.postedAt.localeCompare(right.postedAt));
 
-const dates = normalizedTransactions.map((transaction) => transaction.postedAt);
-const startDate = dates.length ? dates.reduce((min, value) => value < min ? value : min) : '';
-const endDate = dates.length ? dates.reduce((max, value) => value > max ? value : max) : '';
-const ledgerSource = normalizedTransactions[normalizedTransactions.length - 1];
-const ledgerBalance = ledgerSource ? parseAmount(ledgerSource['Post-Transaction Balance']) : 0;
+  if (normalizedTransactions.length === 0) {
+    throw new Error('No valid Hana transactions were found in the export.');
+  }
 
-const ofxHeader = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+  const dates = normalizedTransactions.map((transaction) => transaction.postedAt);
+  const startDate = dates.reduce((min, value) => value < min ? value : min);
+  const endDate = dates.reduce((max, value) => value > max ? value : max);
+  const ledgerSource = normalizedTransactions[normalizedTransactions.length - 1];
+  const ledgerBalance = parseAmount(ledgerSource['Post-Transaction Balance']);
+
+  const ofxHeader = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?OFX OFXHEADER="200" VERSION="211" SECURITY="NONE">
 <OFX>
 <BANKMSGSRSV1>
@@ -160,7 +164,7 @@ const ofxHeader = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
         <DTEND>${endDate}</DTEND>
 `;
 
-const ofxFooter = `
+  const ofxFooter = `
       </BANKTRANLIST>
       <LEDGERBAL>
         <BALAMT>${ledgerBalance}</BALAMT>
@@ -181,10 +185,10 @@ const escapeXml = (unsafe) => {
     .replace(/'/g, "&apos;");
 };
 
-const ofxTransactions = normalizedTransactions.map((transaction) => {
-  const type = transaction.amount > 0 ? "CREDIT" : "DEBIT";
+  const ofxTransactions = normalizedTransactions.map((transaction) => {
+    const type = transaction.amount > 0 ? "CREDIT" : "DEBIT";
 
-  return `          <STMTTRN>
+    return `          <STMTTRN>
           <TRNTYPE>${type}</TRNTYPE>
           <DTPOSTED>${transaction.postedAt}</DTPOSTED>
           <TRNAMT>${transaction.amount}</TRNAMT>
@@ -192,9 +196,9 @@ const ofxTransactions = normalizedTransactions.map((transaction) => {
           <NAME>${escapeXml(transaction.name)}</NAME>
           <MEMO>${escapeXml(transaction.memo)}</MEMO>
         </STMTTRN>`;
-});
+  });
 
-return ofxHeader + ofxTransactions.join("\n") + ofxFooter;
+  return ofxHeader + ofxTransactions.join("\n") + ofxFooter;
 }
 function processFile(data) {
   const transactions = parseCSV(data);
