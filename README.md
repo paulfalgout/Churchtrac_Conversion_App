@@ -68,7 +68,7 @@ Basic setup:
 2. Sign in with your ChatGPT account.
 3. Open this repository folder in the app:
    ```bash
-   /Users/paulfalgout/Projects/ChurchTrac_Conversion_App
+   /Users/YourUser/Projects/ChurchTrac_Conversion_App
    ```
 4. Ask Codex to inspect the repo before making changes.
 5. Review the diff before accepting edits.
