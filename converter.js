@@ -22,12 +22,53 @@ function parseCSVLine(line) {
 
 // New Hana bank layout (Korean headers) as of 2026 exports.
 const expectedNewLayoutHeaders = ['No', '거래일시', '적요', '추가메모', '의뢰인/수취인', '입금', '출금', '거래후잔액', '구분', '거래점', '거래특이사항'];
+const bankAccountId = '174-890020-19904';
+const bankCurrency = 'KRW';
+
+function parseAmount(value) {
+  const normalized = (value || '').replace(/,/g, '').trim();
+  if (!normalized) return 0;
+
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function normalizeDateTime(value) {
+  const match = (value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+  if (!match) return '';
+
+  const [, year, month, day, hour = '00', minute = '00', second = '00'] = match;
+  return `${year}${month}${day}${hour}${minute}${second}`;
+}
+
+function collapseWhitespace(value) {
+  return (value || '').replace(/\s+/g, ' ').trim();
+}
+
+function joinUniqueParts(parts) {
+  const seen = new Set();
+
+  return parts
+    .map((part) => collapseWhitespace(part))
+    .filter((part) => {
+      if (!part) return false;
+
+      const key = part.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join(' ');
+}
 
 function parseCSV(data) {
   const rows = data.split(/\r?\n/).filter((row) => row.trim());
   if (rows.length < 2) return [];
 
-  const headers = rows[0].split('|').map((value) => value.trim());
+  const headers = rows[0].split('|').map((value, index) => {
+    const trimmed = value.trim();
+    return index === 0 ? trimmed.replace(/^\uFEFF/, '') : trimmed;
+  });
   const hasExpectedLayout = expectedNewLayoutHeaders.every((header, index) => headers[index] === header);
   if (!hasExpectedLayout) {
     throw new Error('Unsupported file layout. Please export the latest Korean Hana transaction format.');
@@ -56,7 +97,53 @@ function parseCSV(data) {
 }
 
 function convertToOFX(transactions) {
-const ofxHeader = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+  const normalizedTransactions = transactions
+    .map((transaction, index) => {
+      const deposit = parseAmount(transaction.Deposit);
+      const withdraw = parseAmount(transaction.Withdraw);
+      const postedAt = normalizeDateTime(transaction['Transaction Date & Time']);
+      const amount = deposit > 0 ? deposit : -withdraw;
+
+      if (!postedAt || amount === 0) return null;
+
+      return {
+        ...transaction,
+        amount,
+        postedAt,
+        name: joinUniqueParts([
+          transaction['Applicant/Beneficiary'],
+          transaction.Remarks,
+          transaction['Additional Memo']
+        ]) || 'Hana transaction',
+        memo: joinUniqueParts([
+          transaction.Remarks,
+          transaction['Additional Memo'],
+          transaction['Applicant/Beneficiary'],
+          transaction.Type,
+          transaction.Branch,
+          transaction['Transaction Remarks']
+        ]),
+        fitId: joinUniqueParts([
+          postedAt,
+          transaction.No,
+          String(index + 1)
+        ]).replace(/\s+/g, '-')
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.postedAt.localeCompare(right.postedAt));
+
+  if (normalizedTransactions.length === 0) {
+    throw new Error('No valid Hana transactions were found in the export.');
+  }
+
+  const dates = normalizedTransactions.map((transaction) => transaction.postedAt);
+  const startDate = dates.reduce((min, value) => value < min ? value : min);
+  const endDate = dates.reduce((max, value) => value > max ? value : max);
+  const ledgerSource = normalizedTransactions[normalizedTransactions.length - 1];
+  const ledgerBalance = parseAmount(ledgerSource['Post-Transaction Balance']);
+
+  const ofxHeader = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?OFX OFXHEADER="200" VERSION="211" SECURITY="NONE">
 <OFX>
 <BANKMSGSRSV1>
@@ -67,15 +154,22 @@ const ofxHeader = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
       <SEVERITY>INFO</SEVERITY>
     </STATUS>
     <STMTRS>
-      <CURDEF>USD</CURDEF>
+      <CURDEF>${bankCurrency}</CURDEF>
       <BANKACCTFROM>
-        <ACCTID>174-890020-19904</ACCTID>
+        <ACCTID>${bankAccountId}</ACCTID>
+        <ACCTTYPE>CHECKING</ACCTTYPE>
       </BANKACCTFROM>
       <BANKTRANLIST>
+        <DTSTART>${startDate}</DTSTART>
+        <DTEND>${endDate}</DTEND>
 `;
 
-const ofxFooter = `
+  const ofxFooter = `
       </BANKTRANLIST>
+      <LEDGERBAL>
+        <BALAMT>${ledgerBalance}</BALAMT>
+        <DTASOF>${endDate}</DTASOF>
+      </LEDGERBAL>
     </STMTRS>
   </STMTTRNRS>
 </BANKMSGSRSV1>
@@ -91,22 +185,20 @@ const escapeXml = (unsafe) => {
     .replace(/'/g, "&apos;");
 };
 
-const ofxTransactions = transactions.map((transaction) => {
-  const type = transaction.Deposit ? "CREDIT" : "DEBIT";
-  const amount = Number(transaction.Deposit.replace(/,/g, '')) || -Number(transaction.Withdraw.replace(/,/g, ''));
-  const date = transaction["Transaction Date & Time"].replace(/[-:\s]/g, "").slice(0, 8); // Convert to YYYYMMDD
+  const ofxTransactions = normalizedTransactions.map((transaction) => {
+    const type = transaction.amount > 0 ? "CREDIT" : "DEBIT";
 
-  return `          <STMTTRN>
+    return `          <STMTTRN>
           <TRNTYPE>${type}</TRNTYPE>
-          <DTPOSTED>${date}</DTPOSTED>
-          <TRNAMT>${amount}</TRNAMT>
-          <FITID>${date}${transaction.No}</FITID>
-          <NAME>${escapeXml(transaction["Applicant/Beneficiary"] || "Unknown")}</NAME>
-          <MEMO>${escapeXml(transaction["Remarks"] || "")} ${escapeXml(transaction["Type"] || "")} ${escapeXml(transaction["Branch"] || "")} ${escapeXml(transaction["Transaction Remarks"] || "")}</MEMO>
+          <DTPOSTED>${transaction.postedAt}</DTPOSTED>
+          <TRNAMT>${transaction.amount}</TRNAMT>
+          <FITID>${escapeXml(transaction.fitId)}</FITID>
+          <NAME>${escapeXml(transaction.name)}</NAME>
+          <MEMO>${escapeXml(transaction.memo)}</MEMO>
         </STMTTRN>`;
-});
+  });
 
-return ofxHeader + ofxTransactions.join("\n") + ofxFooter;
+  return ofxHeader + ofxTransactions.join("\n") + ofxFooter;
 }
 function processFile(data) {
   const transactions = parseCSV(data);
