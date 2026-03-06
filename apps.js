@@ -172,12 +172,14 @@ function focusOutputState(tone = 'success') {
   state.classList.add(stateClass);
   panel.classList.add(panelClass);
 
-  window.setTimeout(() => {
+  window.clearTimeout(focusOutputTimer);
+  focusOutputTimer = window.setTimeout(() => {
     state.classList.remove(stateClass);
     panel.classList.remove(panelClass);
   }, 2200);
 }
 
+let focusOutputTimer;
 let toastTimer;
 
 function showWorkspaceToast({ tone = 'success', title, detail = '' }) {
@@ -192,21 +194,55 @@ function showWorkspaceToast({ tone = 'success', title, detail = '' }) {
     workspace.appendChild(toast);
   }
 
-  const icon = tone === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check';
-  const label = tone === 'error' ? 'Conversion Error' : 'Conversion Complete';
-  const sparkle = tone === 'error' ? '' : '<div class="workspace-toast-sparkles"><span></span><span></span><span></span></div>';
-
   toast.className = `workspace-toast workspace-toast-${tone} workspace-toast-visible`;
-  toast.innerHTML = `
-    ${sparkle}
-    <div class="workspace-toast-icon"><i class="fas ${icon}"></i></div>
-    <div class="workspace-toast-copy">
-      <div class="workspace-toast-label">${label}</div>
-      <div class="workspace-toast-title">${title}</div>
-      <div class="workspace-toast-detail">${detail}</div>
-    </div>
-    <div class="workspace-toast-progress"></div>
-  `;
+  toast.replaceChildren();
+
+  if (tone !== 'error') {
+    const sparkleContainer = document.createElement('div');
+    sparkleContainer.className = 'workspace-toast-sparkles';
+    for (let index = 0; index < 3; index += 1) {
+      sparkleContainer.appendChild(document.createElement('span'));
+    }
+    toast.appendChild(sparkleContainer);
+  }
+
+  const iconClass = tone === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check';
+  const labelText = tone === 'error' ? 'Conversion Error' : 'Conversion Complete';
+
+  const iconWrapper = document.createElement('div');
+  iconWrapper.className = 'workspace-toast-icon';
+  const iconElement = document.createElement('i');
+  iconElement.className = `fas ${iconClass}`;
+  iconWrapper.appendChild(iconElement);
+  toast.appendChild(iconWrapper);
+
+  const copyContainer = document.createElement('div');
+  copyContainer.className = 'workspace-toast-copy';
+
+  const labelElement = document.createElement('div');
+  labelElement.className = 'workspace-toast-label';
+  labelElement.textContent = labelText;
+  copyContainer.appendChild(labelElement);
+
+  if (title) {
+    const titleElement = document.createElement('div');
+    titleElement.className = 'workspace-toast-title';
+    titleElement.textContent = title;
+    copyContainer.appendChild(titleElement);
+  }
+
+  if (detail) {
+    const detailElement = document.createElement('div');
+    detailElement.className = 'workspace-toast-detail';
+    detailElement.textContent = detail;
+    copyContainer.appendChild(detailElement);
+  }
+
+  toast.appendChild(copyContainer);
+
+  const progressElement = document.createElement('div');
+  progressElement.className = 'workspace-toast-progress';
+  toast.appendChild(progressElement);
 
   window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => {
@@ -347,7 +383,7 @@ function setSuccessState({ title, detail, pills = [], outputPath }) {
   renderOutputState({
     tone: 'success',
     title,
-    detail: `${detail} Saved to ${outputPath}.`,
+    detail,
     pills: [
       { label: fileName, icon: 'fa-file-export' },
       ...pills

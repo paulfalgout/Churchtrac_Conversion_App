@@ -5,6 +5,7 @@
 |------|--------|----------------|-------------------|
 | 2026-03-06 | self | Started repo inspection before a napkin file existed. | Create `.claude/napkin.md` immediately when it is missing, then keep it updated during the task. |
 | 2026-03-06 | self | Used backticks inside a shell `rg` search string and accidentally triggered shell command substitution. | Quote shell search patterns without backticks or escape them before running commands from bash. |
+| 2026-03-06 | self | Moved giving category fallback logic into `processGivingFiles` but still inferred category before branching by file type, which would have kept throwing for unknown CSV filenames. | When a fallback differs by file type, branch on the extension first and infer category inside each branch. |
 
 ## User Preferences
 - Keep Tithely giving categories mapped as: `Building Campaign` -> `Pledges`, `SENT Missions` -> `Sent Missions Income`, everything else -> `General Offerings`.
@@ -16,6 +17,7 @@
 - Real Tithely exports in this repo context use the header `Fund Name`; observed values include `FVC General Giving`, `Building Campaign`, and `FVC 1:30pm`.
 - Current Hana giving imports can support both the new 11-column `.txt` export layout and ChurchTrac-shaped `.csv` inputs in the same merge flow.
 - For Hana monthly giving merges, infer category from the filename: `build` -> `Pledges`, `sent` -> `Sent Missions Income`, `giving` -> `General Offerings`.
+- For ChurchTrac-shaped giving CSVs, only override the Category column when the filename clearly indicates `build`, `sent`, or `giving`; otherwise preserve the CSV's existing category.
 
 ## Patterns That Don't Work
 - Hard-coding the Tithely category to `General Offerings` loses pledge and missions distinctions.

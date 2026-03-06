@@ -223,10 +223,11 @@ function processFile(data) {
 }
 
 const escapeCSVValue = (value) => {
-  if (typeof value === 'string' && value.includes(',')) {
-      return `"${value.replace(/"/g, '""')}"`; // Escape double quotes inside the value
+  const normalizedValue = value == null ? '' : String(value);
+  if (/[",\n\r]/.test(normalizedValue)) {
+      return `"${normalizedValue.replace(/"/g, '""')}"`;
   }
-  return value;
+  return normalizedValue;
 };
 
 const givingCsvHeaders = [
@@ -257,13 +258,14 @@ function normalizeCsvCell(value) {
   return trimmed;
 }
 
-function inferGivingCategoryFromFilename(filename, { fallbackToGeneral = false } = {}) {
+function inferGivingCategoryFromFilename(filename, { fallbackToGeneral = false, allowUnknown = false } = {}) {
   const normalizedName = collapseWhitespace(filename).toLowerCase();
 
   if (normalizedName.includes('build')) return 'Pledges';
   if (normalizedName.includes('sent')) return 'Sent Missions Income';
   if (normalizedName.includes('giving')) return 'General Offerings';
   if (fallbackToGeneral) return 'General Offerings';
+  if (allowUnknown) return null;
 
   throw new Error(`Unable to determine giving category from filename "${filename}". Include build, sent, or giving in the file name.`);
 }
@@ -348,18 +350,22 @@ function processGivingFiles(files) {
 
   const mergedRows = files.flatMap((file) => {
     const normalizedName = (file?.name || '').toLowerCase();
-    const category = inferGivingCategoryFromFilename(file?.name || '', {
-      fallbackToGeneral: normalizedName.endsWith('.txt')
-    });
 
     if (normalizedName.endsWith('.txt')) {
+      const category = inferGivingCategoryFromFilename(file?.name || '', {
+        fallbackToGeneral: true
+      });
       return buildGivingRowsFromTransactions(parseCSV(file.data), category);
     }
 
     if (normalizedName.endsWith('.csv')) {
+      const inferredCategory = inferGivingCategoryFromFilename(file?.name || '', {
+        allowUnknown: true
+      });
       return parseChurchTracGivingCSV(file.data).map((row) => {
+        if (!inferredCategory) return row;
         const nextRow = [...row];
-        nextRow[2] = escapeCSVValue(category);
+        nextRow[2] = escapeCSVValue(inferredCategory);
         return nextRow;
       });
     }

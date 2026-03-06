@@ -13,7 +13,8 @@ function readFileAsText(file) {
 }
 
 function isSupportedGivingFile(file) {
-  return file.name.endsWith('.csv') || file.name.endsWith('.txt');
+  const name = (file?.name || '').toLowerCase();
+  return name.endsWith('.csv') || name.endsWith('.txt');
 }
 
 async function handleGivingFiles(files) {
