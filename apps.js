@@ -334,7 +334,7 @@ function renderGivingScreen() {
           { label: 'Stable donor ID generation', icon: 'fa-fingerprint' },
           { label: 'Memo trimming built in', icon: 'fa-scissors' }
         ],
-        icon: 'fa-sparkles',
+        icon: 'fa-hand-holding-usd',
         accept: '.txt'
       })}
 
