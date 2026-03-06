@@ -61,6 +61,28 @@ function joinUniqueParts(parts) {
     .join(' ');
 }
 
+function buildPayeeName(transaction) {
+  return collapseWhitespace(
+    transaction['Applicant/Beneficiary']
+    || transaction.Remarks
+    || transaction['Additional Memo']
+    || 'Hana transaction'
+  );
+}
+
+function buildMemo(transaction, payeeName) {
+  const payeeKey = (payeeName || '').toLowerCase();
+
+  return joinUniqueParts([
+    transaction.Remarks,
+    transaction['Additional Memo'],
+    transaction['Applicant/Beneficiary'],
+    transaction.Type,
+    transaction.Branch,
+    transaction['Transaction Remarks']
+  ].filter((part) => collapseWhitespace(part).toLowerCase() !== payeeKey));
+}
+
 function parseCSV(data) {
   const rows = data.split(/\r?\n/).filter((row) => row.trim());
   if (rows.length < 2) return [];
@@ -103,6 +125,7 @@ function convertToOFX(transactions) {
       const withdraw = parseAmount(transaction.Withdraw);
       const postedAt = normalizeDateTime(transaction['Transaction Date & Time']);
       const amount = deposit > 0 ? deposit : -withdraw;
+      const payeeName = buildPayeeName(transaction);
 
       if (!postedAt || amount === 0) return null;
 
@@ -110,19 +133,8 @@ function convertToOFX(transactions) {
         ...transaction,
         amount,
         postedAt,
-        name: joinUniqueParts([
-          transaction['Applicant/Beneficiary'],
-          transaction.Remarks,
-          transaction['Additional Memo']
-        ]) || 'Hana transaction',
-        memo: joinUniqueParts([
-          transaction.Remarks,
-          transaction['Additional Memo'],
-          transaction['Applicant/Beneficiary'],
-          transaction.Type,
-          transaction.Branch,
-          transaction['Transaction Remarks']
-        ]),
+        name: payeeName,
+        memo: buildMemo(transaction, payeeName),
         fitId: joinUniqueParts([
           postedAt,
           transaction.No,
