@@ -26,14 +26,14 @@ const appDefinitions = {
   Giving: {
     kicker: 'Offerings to ChurchTrac',
     title: 'Shape incoming giving data into a cleaner ChurchTrac import.',
-    status: 'Ready for deposit text export',
+    status: 'Ready for giving exports',
     template: renderGivingScreen,
     onLoad: () => {
       renderOutputState({
         tone: 'idle',
         title: 'Awaiting giving export',
-        detail: 'Drop the latest HanaBank giving text file to generate a ChurchTrac-ready CSV.',
-        pills: ['Source: .txt', 'Output: .csv']
+        detail: 'Drop one or more giving, build, or sent exports to generate a merged ChurchTrac-ready CSV.',
+        pills: ['Source: .csv or .txt', 'Output: .csv']
       });
       attachGivingEventListeners();
     }
@@ -158,16 +158,159 @@ function renderOutputState({ tone = 'idle', title, detail = '', pills = [], acti
   }
 }
 
-function bindFileDropZone({ fileInputId = 'file-input', dropZoneId = 'drop-zone', onFile }) {
+function focusOutputState(tone = 'success') {
+  const state = document.getElementById('output-state');
+  const panel = state?.closest('.output-panel');
+  if (!state || !panel) return;
+
+  state.classList.remove('state-announcement-success', 'state-announcement-error');
+  panel.classList.remove('panel-announcement-success', 'panel-announcement-error');
+
+  const stateClass = tone === 'error' ? 'state-announcement-error' : 'state-announcement-success';
+  const panelClass = tone === 'error' ? 'panel-announcement-error' : 'panel-announcement-success';
+
+  state.classList.add(stateClass);
+  panel.classList.add(panelClass);
+
+  window.clearTimeout(focusOutputTimer);
+  focusOutputTimer = window.setTimeout(() => {
+    state.classList.remove(stateClass);
+    panel.classList.remove(panelClass);
+  }, 2200);
+}
+
+let focusOutputTimer;
+let toastTimer;
+
+function showWorkspaceToast({ tone = 'success', title, detail = '' }) {
+  const workspace = document.querySelector('.workspace');
+  if (!workspace) return;
+
+  let toast = document.getElementById('workspace-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'workspace-toast';
+    toast.className = 'workspace-toast';
+    workspace.appendChild(toast);
+  }
+
+  toast.className = `workspace-toast workspace-toast-${tone} workspace-toast-visible`;
+  toast.replaceChildren();
+
+  if (tone !== 'error') {
+    const sparkleContainer = document.createElement('div');
+    sparkleContainer.className = 'workspace-toast-sparkles';
+    for (let index = 0; index < 3; index += 1) {
+      sparkleContainer.appendChild(document.createElement('span'));
+    }
+    toast.appendChild(sparkleContainer);
+  }
+
+  const iconClass = tone === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check';
+  const labelText = tone === 'error' ? 'Conversion Error' : 'Conversion Complete';
+
+  const iconWrapper = document.createElement('div');
+  iconWrapper.className = 'workspace-toast-icon';
+  const iconElement = document.createElement('i');
+  iconElement.className = `fas ${iconClass}`;
+  iconWrapper.appendChild(iconElement);
+  toast.appendChild(iconWrapper);
+
+  const copyContainer = document.createElement('div');
+  copyContainer.className = 'workspace-toast-copy';
+
+  const labelElement = document.createElement('div');
+  labelElement.className = 'workspace-toast-label';
+  labelElement.textContent = labelText;
+  copyContainer.appendChild(labelElement);
+
+  if (title) {
+    const titleElement = document.createElement('div');
+    titleElement.className = 'workspace-toast-title';
+    titleElement.textContent = title;
+    copyContainer.appendChild(titleElement);
+  }
+
+  if (detail) {
+    const detailElement = document.createElement('div');
+    detailElement.className = 'workspace-toast-detail';
+    detailElement.textContent = detail;
+    copyContainer.appendChild(detailElement);
+  }
+
+  toast.appendChild(copyContainer);
+
+  const progressElement = document.createElement('div');
+  progressElement.className = 'workspace-toast-progress';
+  toast.appendChild(progressElement);
+
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    toast.classList.remove('workspace-toast-visible');
+  }, 4200);
+}
+
+function launchCelebration() {
+  const workspace = document.querySelector('.workspace');
+  if (!workspace) return;
+
+  const layer = document.createElement('div');
+  layer.className = 'celebration-layer';
+
+  const palette = ['#68e3ff', '#89f7c7', '#ffd27d', '#ff9966', '#ecf5ff'];
+
+  for (let index = 0; index < 28; index += 1) {
+    const piece = document.createElement('span');
+    const originX = 16 + Math.random() * 68;
+    const driftX = (Math.random() - 0.5) * 260;
+    const driftY = 100 + Math.random() * 180;
+    const rotation = -220 + Math.random() * 440;
+    const delay = Math.random() * 140;
+    const duration = 900 + Math.random() * 700;
+    const color = palette[index % palette.length];
+
+    piece.className = 'confetti-piece';
+    piece.style.left = `${originX}%`;
+    piece.style.top = `${18 + Math.random() * 16}%`;
+    piece.style.background = color;
+    piece.style.setProperty('--drift-x', `${driftX}px`);
+    piece.style.setProperty('--drift-y', `${driftY}px`);
+    piece.style.setProperty('--spin', `${rotation}deg`);
+    piece.style.animationDelay = `${delay}ms`;
+    piece.style.animationDuration = `${duration}ms`;
+    layer.appendChild(piece);
+  }
+
+  workspace.appendChild(layer);
+  window.setTimeout(() => layer.remove(), 2200);
+}
+
+function bindFileDropZone({ fileInputId = 'file-input', dropZoneId = 'drop-zone', onFile, onFiles, multiple = false }) {
   const dropZone = document.getElementById(dropZoneId);
   const fileInput = document.getElementById(fileInputId);
 
   if (!dropZone || !fileInput) return;
 
+  fileInput.multiple = multiple;
+
+  function dispatchFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
+
+    if (multiple && typeof onFiles === 'function') {
+      onFiles(files);
+      return;
+    }
+
+    if (typeof onFile === 'function') {
+      onFile(files[0]);
+    }
+  }
+
   dropZone.addEventListener('dragover', (event) => {
     event.preventDefault();
     dropZone.classList.add('dragging');
-    setWorkspaceStatus('Drop file to begin conversion', 'processing');
+    setWorkspaceStatus(multiple ? 'Drop files to begin conversion' : 'Drop file to begin conversion', 'processing');
   });
 
   dropZone.addEventListener('dragleave', () => {
@@ -178,14 +321,13 @@ function bindFileDropZone({ fileInputId = 'file-input', dropZoneId = 'drop-zone'
   dropZone.addEventListener('drop', (event) => {
     event.preventDefault();
     dropZone.classList.remove('dragging');
-    const file = event.dataTransfer.files[0];
-    if (file) onFile(file);
+    dispatchFiles(event.dataTransfer.files);
   });
 
   dropZone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) onFile(file);
+    dispatchFiles(event.target.files);
+    fileInput.value = '';
   });
 }
 
@@ -207,6 +349,8 @@ function setErrorState(title, detail) {
     detail,
     pills: [{ label: 'Conversion halted', icon: 'fa-triangle-exclamation' }]
   });
+  showWorkspaceToast({ tone: 'error', title, detail });
+  focusOutputState('error');
 }
 
 function makeOpenAction(outputPath) {
@@ -234,20 +378,28 @@ function makeRevealAction(outputPath) {
 
 function setSuccessState({ title, detail, pills = [], outputPath }) {
   const path = require('path');
-  setWorkspaceStatus('Conversion completed', 'success');
+  const fileName = path.basename(outputPath);
+  setWorkspaceStatus(`Saved ${fileName}`, 'success');
   renderOutputState({
     tone: 'success',
     title,
     detail,
     pills: [
-      { label: path.basename(outputPath), icon: 'fa-file-export' },
+      { label: fileName, icon: 'fa-file-export' },
       ...pills
     ],
     actions: [makeOpenAction(outputPath), makeRevealAction(outputPath)]
   });
+  showWorkspaceToast({
+    tone: 'success',
+    title,
+    detail: `${fileName} is ready.`
+  });
+  launchCelebration();
+  focusOutputState('success');
 }
 
-function renderHeroPanel({ eyebrow, title, copy, chips, icon, accept }) {
+function renderHeroPanel({ eyebrow, title, copy, chips, icon, accept, multiple = false }) {
   return `
     <section class="panel hero-panel">
       <div>
@@ -260,10 +412,10 @@ function renderHeroPanel({ eyebrow, title, copy, chips, icon, accept }) {
       </div>
       <div class="drop-zone" id="drop-zone">
         <div class="drop-icon"><i class="fas ${icon}"></i></div>
-        <div class="drop-copy">Drag a ${accept} file here or click to upload</div>
+        <div class="drop-copy">${multiple ? 'Drag files here or click to upload' : `Drag a ${accept} file here or click to upload`}</div>
         <div class="drop-meta">A calmer intake surface for messy exports and release-bound conversions.</div>
       </div>
-      <input class="hidden-input" type="file" id="file-input" accept="${accept}">
+      <input class="hidden-input" type="file" id="file-input" accept="${accept}" ${multiple ? 'multiple' : ''}>
     </section>
   `;
 }
@@ -327,24 +479,25 @@ function renderGivingScreen() {
     <div class="app-grid">
       ${renderHeroPanel({
         eyebrow: 'Giving Intake',
-        title: 'Turn donor deposits into ChurchTrac-ready rhythm.',
-        copy: 'Filters non-deposit lines, derives stable member IDs, and shapes the export for a cleaner giving import workflow.',
+        title: 'Merge monthly giving exports into one import-ready file.',
+        copy: 'Combine split Hana exports, infer build or sent categories from the filename, and generate a single ChurchTrac CSV for the month.',
         chips: [
           { label: 'ChurchTrac CSV output', icon: 'fa-table' },
-          { label: 'Stable donor ID generation', icon: 'fa-fingerprint' },
-          { label: 'Memo trimming built in', icon: 'fa-scissors' }
+          { label: 'Filename-based category mapping', icon: 'fa-tags' },
+          { label: 'Multi-file monthly merge', icon: 'fa-layer-group' }
         ],
         icon: 'fa-hand-holding-usd',
-        accept: '.txt'
+        accept: '.csv,.txt',
+        multiple: true
       })}
 
       <aside class="side-panel">
         <section class="panel">
           <div class="panel-heading">What It Does</div>
           <ul class="note-list">
-            <li>Keeps only valid positive deposits from the Hana export.</li>
-            <li>Builds compact memo text from remarks and additional memo fields.</li>
-            <li>Formats names into the columns ChurchTrac expects.</li>
+            <li>Merges any number of giving, build, and sent exports into one CSV.</li>
+            <li>Maps build files to Pledges and sent files to Sent Missions Income.</li>
+            <li>Still converts supported Hana text exports when those are dropped in.</li>
           </ul>
         </section>
         <section class="panel">
@@ -352,7 +505,7 @@ function renderGivingScreen() {
           <div class="stat-grid">
             <div class="metric-card">
               <div class="metric-label">Source</div>
-              <div class="metric-value">Hana TXT</div>
+              <div class="metric-value">CSV / TXT</div>
             </div>
             <div class="metric-card">
               <div class="metric-label">Target</div>
