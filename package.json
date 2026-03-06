@@ -7,7 +7,8 @@
     "start": "electron .",
     "package": "electron-packager . ConversionApp --platform=darwin,win32 --arch=x64 --out=dist --icon=assets/app-icon",
     "build": "electron-builder",
-    "dist:win": "electron-builder --win --x64 --publish never"
+    "dist:win": "electron-builder --win --x64 --publish never",
+    "dist:mac": "electron-builder --mac --publish never"
   },
   "dependencies": {
     "@electron/remote": "^2.1.2",
@@ -35,7 +36,10 @@
       "*.js"
     ],
     "mac": {
-      "target": "dmg",
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "assets/app-icon.icns"
     },
     "win": {
@@ -60,6 +64,9 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "dmg": {
+      "artifactName": "${productName} ${version}.${ext}"
     },
     "portable": {
       "artifactName": "${productName} ${version}.${ext}"
