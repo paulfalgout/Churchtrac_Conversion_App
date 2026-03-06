@@ -277,9 +277,37 @@ const processGivingFile = (data) => {
 
 const allowedStatuses = ['succeeded', 'pending'];
 
+function normalizeHeaderName(value) {
+  return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function findTithelyFundColumn(headers) {
+  const normalizedHeaders = headers.map((header) => normalizeHeaderName(header));
+  const preferredNames = new Set([
+    'fund',
+    'fundname',
+    'givingfund',
+    'tofund'
+  ]);
+
+  const exactMatchIndex = normalizedHeaders.findIndex((header) => preferredNames.has(header));
+  if (exactMatchIndex >= 0) return exactMatchIndex;
+
+  return normalizedHeaders.findIndex((header) => header.includes('fund'));
+}
+
+function mapTithelyCategory(fundName) {
+  const normalizedFundName = collapseWhitespace(fundName).toLowerCase();
+
+  if (normalizedFundName === 'building campaign') return 'Pledges';
+  if (normalizedFundName === 'sent missions') return 'Sent Missions Income';
+  return 'General Offerings';
+}
+
 function parseTithely(csvString, conversionRate) {
     const lines = csvString.split("\n").map(line => line.trim()).filter(line => line);
     const headers = lines.shift().split(",").map(h => h.replace(/"/g, '').trim()); // Remove quotes and trim spaces
+    const fundColumnIndex = findTithelyFundColumn(headers);
 
     const requiredFields = {
         "Email": null,
@@ -324,11 +352,12 @@ function parseTithely(csvString, conversionRate) {
       // Convert transaction date format
       const dateParts = cols[requiredFields["Transaction Date"]].split(".");
       const formattedDate = `20${dateParts[0].trim()}-${dateParts[1].trim().padStart(2, '0')}-${dateParts[2].trim().padStart(2, '0')}`;
+      const fundName = fundColumnIndex >= 0 ? cols[fundColumnIndex] : "";
 
       const row = [
           escapeCSVValue(cols[requiredFields["Email"]]), // Email/Member Number
           escapeCSVValue(amount), // Amount in cents
-          "General Offerings", // Category
+          escapeCSVValue(mapTithelyCategory(fundName)), // Category
           "no", // Tax Deductible
           escapeCSVValue(cols[requiredFields["Memo"]] || ""), // Memo
           escapeCSVValue(formattedDate), // Date
