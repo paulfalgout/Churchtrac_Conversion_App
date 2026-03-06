@@ -62,12 +62,17 @@ function joinUniqueParts(parts) {
 }
 
 function buildPayeeName(transaction) {
-  return collapseWhitespace(
-    transaction['Applicant/Beneficiary']
-    || transaction.Remarks
-    || transaction['Additional Memo']
-    || 'Hana transaction'
-  );
+  const candidates = [
+    transaction['Applicant/Beneficiary'],
+    transaction.Remarks,
+    transaction['Additional Memo']
+  ];
+
+  const payeeName = candidates
+    .map((value) => collapseWhitespace(value))
+    .find((value) => value);
+
+  return payeeName || 'Hana transaction';
 }
 
 function buildMemo(transaction, payeeName) {
