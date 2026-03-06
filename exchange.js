@@ -1,105 +1,121 @@
-// Globals in settings.js
+const tithelyConverter = require('./converter');
+const tithelyWriter = require('./writer');
+const tithelyPath = require('path');
+const ExchangeStore = require('electron-store');
 
+const exchangeStore = new ExchangeStore();
 
 function handleTithelyFile(file) {
-  if (file.name.endsWith('.csv')) {
-    const reader = new FileReader();
-    reader.onload = async(e) => {
-      const { rate } = await getRate();
-      const data = converter.parseTithely(e.target.result, rate);
-      const outputPath = await writer.writeFile('tithely', 'csv', data);
-      const output = document.getElementById('output');
-      output.innerHTML = `File written to: ${ path.basename(outputPath) } `;
-      openButton.path = outputPath;
-      showButton.path = outputPath;
-      output.appendChild(openButton);
-      output.appendChild(showButton);
-    }
-    reader.readAsText(file);
-  } else {
-    alert('Please upload a .txt file.');
+  if (!file.name.endsWith('.csv')) {
+    setErrorState('Unsupported Tithe.ly file', 'Upload a Tithe.ly CSV export ending in .csv.');
+    return;
   }
+
+  const reader = new FileReader();
+  setProcessingState('Processing Tithe.ly export', `Reading ${file.name} and applying the active KRW rate.`);
+
+  reader.onload = async(event) => {
+    try {
+      const { rate } = await getRate();
+      const data = tithelyConverter.parseTithely(event.target.result, rate);
+      const outputPath = await tithelyWriter.writeFile('tithely', 'csv', data);
+
+      setSuccessState({
+        title: 'Tithe.ly CSV generated',
+        detail: `Saved ${tithelyPath.basename(outputPath)} from ${file.name} using rate ${rate}.`,
+        outputPath,
+        pills: [
+          { label: `KRW rate ${rate}`, icon: 'fa-won-sign' },
+          { label: 'Card giving mapped', icon: 'fa-credit-card' }
+        ]
+      });
+    } catch (error) {
+      setErrorState('Tithe.ly conversion failed', error.message || 'Failed to process Tithe.ly file.');
+    }
+  };
+
+  reader.readAsText(file);
 }
 
 async function fetchRate() {
-  try {
-    const response = await fetch('https://api.apilayer.com/exchangerates_data/latest?base=USD&symbols=KRW', {
-      headers: { 'apikey': 'as2HUVcOfa1PYK6NdGOCWCMSiJRfffBw' },
-    });
-    const data = await response.json();
-    const exchangeRate = { rate: data.rates.KRW, date: data.date };
-    store.set('exchangeRate', exchangeRate);
-    return exchangeRate;
-  } catch (error) {
-    console.error('Error fetching exchange rate:', error);
-    throw error;
+  const response = await fetch('https://api.apilayer.com/exchangerates_data/latest?base=USD&symbols=KRW', {
+    headers: { apikey: 'as2HUVcOfa1PYK6NdGOCWCMSiJRfffBw' }
+  });
+
+  const data = await response.json();
+  if (!data?.rates?.KRW) {
+    throw new Error('Exchange rate response did not include KRW.');
   }
+
+  const exchangeRate = { rate: data.rates.KRW, date: data.date };
+  exchangeStore.set('exchangeRate', exchangeRate);
+  return exchangeRate;
 }
 
 async function getRate() {
-  const currentExchange = store.get('exchangeRate');
+  const currentExchange = exchangeStore.get('exchangeRate');
   if (currentExchange) {
-    const date = new Date(currentExchange.date);
+    const savedDate = new Date(currentExchange.date);
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    if (date > oneMonthAgo) return currentExchange;
+    if (savedDate > oneMonthAgo) return currentExchange;
   }
 
-  return await fetchRate();
+  return fetchRate();
 }
 
 function updateRate(rate, date) {
-  document.getElementById('current-rate').textContent = rate;
-  document.getElementById('manual-rate').value = rate;
-  document.getElementById('last-updated').textContent = date;
+  const currentRate = document.getElementById('current-rate');
+  const manualRate = document.getElementById('manual-rate');
+  const lastUpdated = document.getElementById('last-updated');
+
+  if (currentRate) currentRate.textContent = rate;
+  if (manualRate) manualRate.value = rate;
+  if (lastUpdated) lastUpdated.textContent = date;
 }
 
 async function attachExchangeEventListeners() {
-  document.getElementById('refresh-rate').addEventListener('click', async () => {
+  const refreshButton = document.getElementById('refresh-rate');
+  const manualRate = document.getElementById('manual-rate');
+
+  refreshButton?.addEventListener('click', async () => {
     try {
+      setWorkspaceStatus('Refreshing exchange rate', 'processing');
       const { rate, date } = await fetchRate();
       updateRate(rate, date);
+      setWorkspaceStatus('Exchange rate updated', 'success');
     } catch (error) {
-      alert('Failed to fetch exchange rate. Please try again.');
+      setWorkspaceStatus('Rate refresh failed', 'error');
+      renderOutputState({
+        tone: 'error',
+        title: 'Exchange rate refresh failed',
+        detail: error.message || 'Failed to fetch exchange rate.',
+        pills: [{ label: 'Manual override available', icon: 'fa-sliders' }]
+      });
     }
   });
 
-  document.getElementById('manual-rate').addEventListener('input', (event) => {
+  manualRate?.addEventListener('input', (event) => {
     const today = new Date();
     const rate = parseFloat(event.target.value);
+
+    if (!Number.isFinite(rate)) return;
+
     const date = today.toISOString().substring(0, 10);
-    const exchangeRate = { rate, date  };
-
-    store.set('exchangeRate', exchangeRate);
+    const exchangeRate = { rate, date };
+    exchangeStore.set('exchangeRate', exchangeRate);
     updateRate(rate, date);
+    setWorkspaceStatus('Manual exchange rate applied', 'success');
   });
 
-  const { rate, date } = await getRate();
-  updateRate(rate, date);
+  try {
+    const { rate, date } = await getRate();
+    updateRate(rate, date);
+  } catch (error) {
+    setWorkspaceStatus('Rate unavailable', 'error');
+  }
 
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input');
-
-  dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('dragging');
-  });
-
-  dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragging');
-  });
-
-  dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('dragging');
-    const file = e.dataTransfer.files[0];
-    if (file) handleTithelyFile(file);
-  });
-
-  dropZone.addEventListener('click', () => fileInput.click());
-
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) handleTithelyFile(file);
+  bindFileDropZone({
+    onFile: handleTithelyFile
   });
 }
