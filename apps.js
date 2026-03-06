@@ -20,7 +20,7 @@ const appDefinitions = {
         detail: 'Drop a HanaBank transaction text file to generate an OFX statement.',
         pills: ['Source: .txt', 'Output: .ofx']
       });
-      attachAccoungingEventListeners();
+      attachAccountingEventListeners();
     }
   },
   Giving: {

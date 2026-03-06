@@ -33,7 +33,7 @@ function handleAcctFile(file) {
   reader.readAsText(file);
 }
 
-function attachAccoungingEventListeners() {
+function attachAccountingEventListeners() {
   bindFileDropZone({
     onFile: handleAcctFile
   });

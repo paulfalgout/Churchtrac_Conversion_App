@@ -1,4 +1,5 @@
 const SettingsStore = require('electron-store');
+const settingsPath = require('path');
 const { dialog: settingsDialog } = require('@electron/remote');
 
 const settingsStore = new SettingsStore();
@@ -25,10 +26,7 @@ function attachSettingsEventListeners() {
       return;
     }
 
-    let selectedPath = filePaths[0];
-    if (!selectedPath.endsWith('/')) {
-      selectedPath += '/';
-    }
+    const selectedPath = settingsPath.normalize(filePaths[0]);
 
     settingsStore.set('defaultPath', selectedPath);
     renderDefaultPath(selectedPath);
