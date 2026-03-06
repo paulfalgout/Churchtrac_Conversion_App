@@ -54,6 +54,43 @@ You can also generate downloadable Windows builds from GitHub without asking use
 4. Download the artifact `conversionapp-windows-<run_number>`.
 5. Share the included `.exe` files.
 
+## TODO: Use Codex To Maintain This Repo
+
+If you want AI help developing this app, use the official OpenAI Codex desktop app:
+
+- Codex app overview: [OpenAI Codex](https://openai.com/codex/)
+- Codex app announcement and availability: [Introducing the Codex app](https://openai.com/index/introducing-the-codex-app/)
+- ChatGPT desktop downloads: [Download ChatGPT](https://openai.com/chatgpt/download)
+
+Basic setup:
+
+1. Install the Codex app or ChatGPT desktop app from OpenAI.
+2. Sign in with your ChatGPT account.
+3. Open this repository folder in the app:
+   ```bash
+   /Users/paulfalgout/Projects/ChurchTrac_Conversion_App
+   ```
+4. Ask Codex to inspect the repo before making changes.
+5. Review the diff before accepting edits.
+
+Good prompts to start with:
+
+- `Read this repo and explain how the Electron app is structured.`
+- `Find the main conversion flows and explain where accounting, giving, and exchange processing live.`
+- `Update the README with clearer build and release instructions, then show me the diff.`
+- `Add a small feature to the app, keep the existing style, and explain which files you changed.`
+- `Review this repo for packaging or installer issues on Windows and macOS.`
+- `Find bugs or risky code paths in the conversion logic and propose fixes.`
+- `Add tests or validation around the CSV conversion logic without changing app behavior.`
+
+Good prompt pattern for future work:
+
+```text
+Open this repo, inspect the current code first, then make the change.
+Keep edits minimal and explain your assumptions.
+After changes, summarize what you changed and any risks or follow-up work.
+```
+
 ## Requirements
 - Node.js 20 (specified in `.nvmrc`)
 - npm
