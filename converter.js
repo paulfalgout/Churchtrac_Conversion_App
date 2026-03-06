@@ -229,25 +229,47 @@ const escapeCSVValue = (value) => {
   return value;
 };
 
+const givingCsvHeaders = [
+  'Email/Member Number',
+  'Amount',
+  'Category',
+  'Tax Deductible',
+  'Memo',
+  'Date',
+  'Contribution Type',
+  'First Name',
+  'Last Name'
+];
+
 const namespace = 'd55c9ce1-da8f-4f8f-ab97-9f8e12c63857';
 
 const { v5: uuidv5 } = require('uuid'); // Import UUID library
 
-const processGivingFile = (data) => {
-  const transactions = parseCSV(data);
-  const headers = [
-    'Email/Member Number',
-    'Amount',
-    'Category',
-    'Tax Deductible',
-    'Memo',
-    'Date',
-    'Contribution Type',
-    'First Name',
-    'Last Name'
-  ];
+function serializeChurchTracRows(rows) {
+  return [givingCsvHeaders, ...rows].map((row) => row.join(',')).join('\n');
+}
 
-  const rows = transactions.map((item) => {
+function normalizeCsvCell(value) {
+  const trimmed = (value || '').trim();
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed.slice(1, -1).replace(/""/g, '"').trim();
+  }
+  return trimmed;
+}
+
+function inferGivingCategoryFromFilename(filename, { fallbackToGeneral = false } = {}) {
+  const normalizedName = collapseWhitespace(filename).toLowerCase();
+
+  if (normalizedName.includes('build')) return 'Pledges';
+  if (normalizedName.includes('sent')) return 'Sent Missions Income';
+  if (normalizedName.includes('giving')) return 'General Offerings';
+  if (fallbackToGeneral) return 'General Offerings';
+
+  throw new Error(`Unable to determine giving category from filename "${filename}". Include build, sent, or giving in the file name.`);
+}
+
+function buildGivingRowsFromTransactions(transactions, category = 'General Offerings') {
+  return transactions.map((item) => {
     const rawDeposit = (item.Deposit || '').replace(/,/g, '').trim();
     const deposit = Number(rawDeposit);
 
@@ -260,20 +282,103 @@ const processGivingFile = (data) => {
     const memo = [item.Remarks, item['Additional Memo']].filter(Boolean).join(' ').trim().slice(0, 64);
 
     return [
-      id, // Column A: Unique identifier (UUID)
-      escapeCSVValue(deposit), // Column B: Amount
-      'General Offerings',
-      'yes', // Column D: Tax Deductible
-      escapeCSVValue(memo), // Column E: Memo (trimmed to 64 characters)
-      escapeCSVValue(item['Transaction Date & Time']), // Column F: Date
-      'ACH', // Column G: Contribution Type
+      id,
+      escapeCSVValue(deposit),
+      escapeCSVValue(category),
+      'yes',
+      escapeCSVValue(memo),
+      escapeCSVValue(item['Transaction Date & Time']),
+      'ACH',
       escapeCSVValue(nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''),
       escapeCSVValue(nameParts[0] || ''),
     ];
-  }).filter(Boolean); // Remove null rows
+  }).filter(Boolean);
+}
 
-  return [headers, ...rows].map((row) => row.join(',')).join('\n');
+function parseChurchTracGivingCSV(data) {
+  const lines = data.split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) return [];
+
+  const headers = parseCSVLine(lines[0]).map(normalizeCsvCell);
+  const headerIndexMap = new Map(headers.map((header, index) => [header, index]));
+
+  const missingHeaders = givingCsvHeaders.filter((header) => !headerIndexMap.has(header));
+  if (missingHeaders.length > 0) {
+    throw new Error(`Giving CSV is missing required columns: ${missingHeaders.join(', ')}.`);
+  }
+
+  return lines.slice(1).map((line) => {
+    const cols = parseCSVLine(line).map(normalizeCsvCell);
+    return givingCsvHeaders.map((header) => escapeCSVValue(cols[headerIndexMap.get(header)] || ''));
+  });
+}
+
+function dedupeChurchTracRows(rows) {
+  const seen = new Set();
+
+  return rows.filter((row) => {
+    const key = row.join('\u0001');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function sortChurchTracRows(rows) {
+  return [...rows].sort((left, right) => {
+    const leftDate = String(left[5] || '');
+    const rightDate = String(right[5] || '');
+
+    return rightDate.localeCompare(leftDate);
+  });
+}
+
+const processGivingFile = (data, options = {}) => {
+  const transactions = parseCSV(data);
+  const category = options.category || 'General Offerings';
+  const rows = buildGivingRowsFromTransactions(transactions, category);
+
+  return serializeChurchTracRows(rows);
 };
+
+function processGivingFiles(files) {
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new Error('Add at least one giving file to continue.');
+  }
+
+  const mergedRows = files.flatMap((file) => {
+    const normalizedName = (file?.name || '').toLowerCase();
+    const category = inferGivingCategoryFromFilename(file?.name || '', {
+      fallbackToGeneral: normalizedName.endsWith('.txt')
+    });
+
+    if (normalizedName.endsWith('.txt')) {
+      return buildGivingRowsFromTransactions(parseCSV(file.data), category);
+    }
+
+    if (normalizedName.endsWith('.csv')) {
+      return parseChurchTracGivingCSV(file.data).map((row) => {
+        const nextRow = [...row];
+        nextRow[2] = escapeCSVValue(category);
+        return nextRow;
+      });
+    }
+
+    throw new Error(`Unsupported giving file "${file?.name || 'unknown'}". Use .csv or .txt.`);
+  });
+
+  const uniqueRows = sortChurchTracRows(dedupeChurchTracRows(mergedRows));
+  const categories = new Set(uniqueRows.map((row) => row[2]));
+
+  return {
+    data: serializeChurchTracRows(uniqueRows),
+    summary: {
+      fileCount: files.length,
+      rowCount: uniqueRows.length,
+      categories: Array.from(categories)
+    }
+  };
+}
 
 const allowedStatuses = ['succeeded', 'pending'];
 
@@ -372,4 +477,4 @@ function parseTithely(csvString, conversionRate) {
   return output.join("\n");
 }
 
-module.exports = { processFile, processGivingFile, parseTithely };
+module.exports = { processFile, processGivingFile, processGivingFiles, parseTithely };

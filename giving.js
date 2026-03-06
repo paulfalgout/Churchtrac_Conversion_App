@@ -2,39 +2,57 @@ const givingConverter = require('./converter');
 const givingWriter = require('./writer');
 const givingPath = require('path');
 
-function handleGivingFile(file) {
-  if (!file.name.endsWith('.txt')) {
-    setErrorState('Unsupported giving file', 'Upload a HanaBank text export ending in .txt.');
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (event) => resolve(event.target.result);
+    reader.onerror = () => reject(new Error(`Failed to read ${file.name}.`));
+    reader.readAsText(file);
+  });
+}
+
+function isSupportedGivingFile(file) {
+  return file.name.endsWith('.csv') || file.name.endsWith('.txt');
+}
+
+async function handleGivingFiles(files) {
+  const unsupportedFile = files.find((file) => !isSupportedGivingFile(file));
+  if (unsupportedFile) {
+    setErrorState('Unsupported giving file', `Use .csv or .txt files only. Problem file: ${unsupportedFile.name}.`);
     return;
   }
 
-  const reader = new FileReader();
-  setProcessingState('Processing giving export', `Reading ${file.name} and preparing ChurchTrac CSV output.`);
+  const fileLabel = files.length === 1 ? files[0].name : `${files.length} files`;
+  setProcessingState('Processing giving export', `Reading ${fileLabel} and preparing a merged ChurchTrac CSV output.`);
 
-  reader.onload = async(event) => {
-    try {
-      const data = await givingConverter.processGivingFile(event.target.result);
-      const outputPath = await givingWriter.writeFile('giving', 'csv', data);
+  try {
+    const loadedFiles = await Promise.all(files.map(async(file) => ({
+      name: file.name,
+      data: await readFileAsText(file)
+    })));
+    const result = await givingConverter.processGivingFiles(loadedFiles);
+    const outputPath = await givingWriter.writeFile('giving', 'csv', result.data);
+    const categorySummary = result.summary.categories.join(', ');
 
-      setSuccessState({
-        title: 'Giving CSV generated',
-        detail: `Saved ${givingPath.basename(outputPath)} from ${file.name}.`,
-        outputPath,
-        pills: [
-          { label: 'ChurchTrac import', icon: 'fa-table' },
-          { label: 'Deposits only', icon: 'fa-filter' }
-        ]
-      });
-    } catch (error) {
-      setErrorState('Giving conversion failed', error.message || 'Failed to process giving file.');
-    }
-  };
-
-  reader.readAsText(file);
+    setSuccessState({
+      title: 'Giving CSV generated',
+      detail: `Saved ${givingPath.basename(outputPath)} from ${fileLabel}. ${result.summary.rowCount} rows across ${categorySummary}.`,
+      outputPath,
+      pills: [
+        { label: 'ChurchTrac import', icon: 'fa-table' },
+        { label: `${result.summary.fileCount} source files`, icon: 'fa-layer-group' },
+        { label: `${result.summary.rowCount} merged rows`, icon: 'fa-list-check' }
+      ]
+    });
+  } catch (error) {
+    setErrorState('Giving conversion failed', error.message || 'Failed to process giving file.');
+  }
 }
 
 function attachGivingEventListeners() {
   bindFileDropZone({
-    onFile: handleGivingFile
+    multiple: true,
+    onFiles: handleGivingFiles
   });
 }
