@@ -1,4 +1,4 @@
-name: Build Release Apps
+name: Build Windows App
 
 on:
   workflow_dispatch:
