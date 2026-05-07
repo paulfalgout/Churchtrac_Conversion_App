@@ -1,0 +1,19 @@
+converter.js
+  s_662ed9e5bfa490::t_2f3f9a5c487082 205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "bdcc00069b2adaea65971a4b35aae9432f12da3d",
+  "prompts": {},
+  "sessions": {
+    "s_662ed9e5bfa490": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e00fd-bcc2-7b02-899a-92c0a0c7244e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Paul Falgout <paul.falgout@roundingwell.com>"
+    }
+  }
+}
