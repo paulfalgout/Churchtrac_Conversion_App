@@ -63,9 +63,9 @@ function joinUniqueParts(parts) {
 
 function buildPayeeName(transaction) {
   const candidates = [
-    transaction['Applicant/Beneficiary'],
     transaction.Remarks,
-    transaction['Additional Memo']
+    transaction['Additional Memo'],
+    transaction['Applicant/Beneficiary']
   ];
 
   const payeeName = candidates
