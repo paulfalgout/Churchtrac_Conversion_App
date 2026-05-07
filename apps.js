@@ -9,16 +9,16 @@ const menuIds = {
 
 const appDefinitions = {
   Accounting: {
-    kicker: 'HanaBank to OFX',
+    kicker: 'Bank Exports to OFX',
     title: 'Convert raw bank exports into quiet, importable signal.',
-    status: 'Ready for HanaBank text export',
+    status: 'Ready for bank export',
     template: renderAccountingScreen,
     onLoad: () => {
       renderOutputState({
         tone: 'idle',
         title: 'Awaiting accounting export',
-        detail: 'Drop a HanaBank transaction text file to generate an OFX statement.',
-        pills: ['Source: .txt', 'Output: .ofx']
+        detail: 'Drop a HanaBank text export or Nonghyup XLS export to generate an OFX statement.',
+        pills: ['Source: .txt or .xls', 'Output: .ofx']
       });
       attachAccountingEventListeners();
     }
@@ -435,22 +435,23 @@ function renderAccountingScreen() {
       ${renderHeroPanel({
         eyebrow: 'Accounting Pipeline',
         title: 'Bank noise in. Import-grade OFX out.',
-        copy: 'Optimized for the current Korean HanaBank text export. The output keeps statement metadata intact and aims for a smoother accounting import path.',
+        copy: 'Optimized for the current Korean HanaBank text export and Nonghyup XLS history export. The output keeps statement metadata intact and aims for a smoother accounting import path.',
         chips: [
-          { label: 'Latest Hana Korean layout', icon: 'fa-building-columns' },
+          { label: 'Hana and Nonghyup layouts', icon: 'fa-building-columns' },
           { label: 'Generates OFX statement', icon: 'fa-file-waveform' },
           { label: 'Chronological transaction pass', icon: 'fa-clock-rotate-left' }
         ],
         icon: 'fa-wave-square',
-        accept: '.txt'
+        accept: '.txt,.xls'
       })}
 
       <aside class="side-panel">
         <section class="panel">
           <div class="panel-heading">Signal Notes</div>
           <ul class="note-list">
-            <li>Supports the current 11-column Hana export with Korean headers.</li>
+            <li>Supports the current 11-column Hana export and Nonghyup XLS transaction history.</li>
             <li>Writes KRW OFX with date bounds and ledger balance metadata.</li>
+            <li>Labels Nonghyup deposits and withdrawals for building campaign import rules.</li>
             <li>Best used with clean account exports that already exclude summary-only rows.</li>
           </ul>
         </section>
@@ -459,7 +460,7 @@ function renderAccountingScreen() {
           <div class="stat-grid">
             <div class="metric-card">
               <div class="metric-label">Input</div>
-              <div class="metric-value">TXT</div>
+              <div class="metric-value">TXT/XLS</div>
             </div>
             <div class="metric-card">
               <div class="metric-label">Output</div>

@@ -20,13 +20,16 @@ function parseCSVLine(line) {
   return result;
 }
 
+const xlsx = require('xlsx');
+
 // New Hana bank layout (Korean headers) as of 2026 exports.
 const expectedNewLayoutHeaders = ['No', '거래일시', '적요', '추가메모', '의뢰인/수취인', '입금', '출금', '거래후잔액', '구분', '거래점', '거래특이사항'];
-const bankAccountId = '174-890020-19904';
+const expectedNhLayoutHeaders = ['구분', '거래일자', '출금금액(원)', '입금금액(원)', '거래 후 잔액(원)', '거래내용', '거래기록사항', '거래점', '거래시간', '이체메모'];
+const hanaBankAccountId = '174-890020-19904';
 const bankCurrency = 'KRW';
 
 function parseAmount(value) {
-  const normalized = (value || '').replace(/,/g, '').trim();
+  const normalized = (value || '').replace(/[,원]/g, '').trim();
   if (!normalized) return 0;
 
   const amount = Number(normalized);
@@ -34,11 +37,11 @@ function parseAmount(value) {
 }
 
 function normalizeDateTime(value) {
-  const match = (value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+  const match = (value || '').trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (!match) return '';
 
   const [, year, month, day, hour = '00', minute = '00', second = '00'] = match;
-  return `${year}${month}${day}${hour}${minute}${second}`;
+  return `${year}${month.padStart(2, '0')}${day.padStart(2, '0')}${hour.padStart(2, '0')}${minute}${second}`;
 }
 
 function collapseWhitespace(value) {
@@ -63,9 +66,10 @@ function joinUniqueParts(parts) {
 
 function buildPayeeName(transaction) {
   const candidates = [
-    transaction['Applicant/Beneficiary'],
+    transaction.Payee,
     transaction.Remarks,
-    transaction['Additional Memo']
+    transaction['Additional Memo'],
+    transaction['Applicant/Beneficiary']
   ];
 
   const payeeName = candidates
@@ -123,7 +127,31 @@ function parseCSV(data) {
     }));
 }
 
-function convertToOFX(transactions) {
+const escapeXml = (unsafe = '') => {
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+};
+
+function buildTransactionMemo(transaction, payeeName) {
+  const classification = transaction.Transfer
+    ? `Transfer: ${transaction.Transfer}`
+    : transaction.Category
+      ? `Category: ${transaction.Category}`
+      : '';
+
+  return joinUniqueParts([
+    classification,
+    buildMemo(transaction, payeeName)
+  ]);
+}
+
+function convertToOFX(transactions, options = {}) {
+  const accountId = options.accountId ?? hanaBankAccountId;
+  const emptyMessage = options.emptyMessage || 'No valid Hana transactions were found in the export.';
   const normalizedTransactions = transactions
     .map((transaction, index) => {
       const deposit = parseAmount(transaction.Deposit);
@@ -131,6 +159,7 @@ function convertToOFX(transactions) {
       const postedAt = normalizeDateTime(transaction['Transaction Date & Time']);
       const amount = deposit > 0 ? deposit : -withdraw;
       const payeeName = buildPayeeName(transaction);
+      const transactionReference = transaction.Reference || transaction.No;
 
       if (!postedAt || amount === 0) return null;
 
@@ -139,10 +168,11 @@ function convertToOFX(transactions) {
         amount,
         postedAt,
         name: payeeName,
-        memo: buildMemo(transaction, payeeName),
+        memo: buildTransactionMemo(transaction, payeeName),
         fitId: joinUniqueParts([
+          accountId,
           postedAt,
-          transaction.No,
+          transactionReference,
           String(index + 1)
         ]).replace(/\s+/g, '-')
       };
@@ -151,7 +181,7 @@ function convertToOFX(transactions) {
     .sort((left, right) => left.postedAt.localeCompare(right.postedAt));
 
   if (normalizedTransactions.length === 0) {
-    throw new Error('No valid Hana transactions were found in the export.');
+    throw new Error(emptyMessage);
   }
 
   const dates = normalizedTransactions.map((transaction) => transaction.postedAt);
@@ -173,7 +203,7 @@ function convertToOFX(transactions) {
     <STMTRS>
       <CURDEF>${bankCurrency}</CURDEF>
       <BANKACCTFROM>
-        <ACCTID>${bankAccountId}</ACCTID>
+        <ACCTID>${escapeXml(accountId)}</ACCTID>
         <ACCTTYPE>CHECKING</ACCTTYPE>
       </BANKACCTFROM>
       <BANKTRANLIST>
@@ -193,15 +223,6 @@ function convertToOFX(transactions) {
 </OFX>
 `;
 
-const escapeXml = (unsafe) => {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-};
-
   const ofxTransactions = normalizedTransactions.map((transaction) => {
     const type = transaction.amount > 0 ? "CREDIT" : "DEBIT";
 
@@ -220,6 +241,105 @@ const escapeXml = (unsafe) => {
 function processFile(data) {
   const transactions = parseCSV(data);
   return convertToOFX(transactions);
+}
+
+function findNhAccountId(rows) {
+  const accountRow = rows.find((row) => collapseWhitespace(row[0]) === '계좌번호');
+  return collapseWhitespace(accountRow?.[2]) || '';
+}
+
+function isNhHeaderRow(row) {
+  return expectedNhLayoutHeaders.every((header, index) => collapseWhitespace(row[index]) === header);
+}
+
+function isHanabankTransfer(transaction) {
+  const bankText = joinUniqueParts([
+    transaction.Remarks,
+    transaction['Applicant/Beneficiary'],
+    transaction.Branch,
+    transaction['Additional Memo'],
+    transaction['Transaction Remarks']
+  ]).toLowerCase();
+
+  return bankText.includes('하나') || bankText.includes('hana');
+}
+
+function buildNhCategory(transaction) {
+  const deposit = parseAmount(transaction.Deposit);
+  const withdraw = parseAmount(transaction.Withdraw);
+
+  if (isHanabankTransfer(transaction)) {
+    return {
+      Category: '',
+      Transfer: deposit > 0 ? 'Hanabank Account In' : 'Hanabank Account Out'
+    };
+  }
+
+  if (deposit > 0) return { Category: 'Building Campaign Income' };
+  if (withdraw > 0) return { Category: 'Building Campaign Expenses' };
+  return { Category: '' };
+}
+
+function parseNhXls(data) {
+  const workbook = xlsx.read(data, { type: 'buffer' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+  if (!sheet) {
+    throw new Error('No worksheet was found in the Nonghyup export.');
+  }
+
+  const rows = xlsx.utils.sheet_to_json(sheet, {
+    header: 1,
+    raw: false,
+    defval: ''
+  });
+  const headerIndex = rows.findIndex(isNhHeaderRow);
+
+  if (headerIndex < 0) {
+    throw new Error('Unsupported file layout. Please export the Nonghyup transaction history XLS format.');
+  }
+
+  const transactions = rows
+    .slice(headerIndex + 1)
+    .filter((row) => collapseWhitespace(row[1]))
+    .map((row) => {
+      const transaction = {
+        Reference: collapseWhitespace(row[0]),
+        'Transaction Date & Time': joinUniqueParts([row[1], row[8]]),
+        Withdraw: collapseWhitespace(row[2]),
+        Deposit: collapseWhitespace(row[3]),
+        'Post-Transaction Balance': collapseWhitespace(row[4]),
+        Remarks: collapseWhitespace(row[5]),
+        Payee: collapseWhitespace(row[6]) || collapseWhitespace(row[5]) || 'Nonghyup transaction',
+        'Applicant/Beneficiary': collapseWhitespace(row[6]),
+        Type: collapseWhitespace(row[5]),
+        Branch: collapseWhitespace(row[7]),
+        'Additional Memo': collapseWhitespace(row[9]),
+        'Transaction Remarks': collapseWhitespace(row[9])
+      };
+
+      return {
+        ...transaction,
+        ...buildNhCategory(transaction)
+      };
+    });
+
+  return {
+    accountId: findNhAccountId(rows),
+    transactions
+  };
+}
+
+function processNhFile(data) {
+  const parsed = parseNhXls(Buffer.isBuffer(data) ? data : Buffer.from(data));
+  if (!parsed.accountId) {
+    throw new Error('No Nonghyup account number was found in the export.');
+  }
+
+  return convertToOFX(parsed.transactions, {
+    accountId: parsed.accountId,
+    emptyMessage: 'No valid Nonghyup transactions were found in the export.'
+  });
 }
 
 const escapeCSVValue = (value) => {
@@ -483,4 +603,4 @@ function parseTithely(csvString, conversionRate) {
   return output.join("\n");
 }
 
-module.exports = { processFile, processGivingFile, processGivingFiles, parseTithely };
+module.exports = { processFile, processNhFile, processGivingFile, processGivingFiles, parseTithely };
