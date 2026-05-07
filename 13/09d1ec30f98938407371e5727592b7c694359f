@@ -1,0 +1,20 @@
+converter.js
+  s_662ed9e5bfa490::t_2f3f9a5c487082 206
+  s_662ed9e5bfa490::t_9996265501dfa0 153-154,162,171,173,175,307-338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "1309d1ec30f98938407371e5727592b7c694359f",
+  "prompts": {},
+  "sessions": {
+    "s_662ed9e5bfa490": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e00fd-bcc2-7b02-899a-92c0a0c7244e",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
