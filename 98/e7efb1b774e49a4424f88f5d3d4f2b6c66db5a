@@ -1,0 +1,32 @@
+converter.js
+  s_a485bfd2855000::t_615c688915387c 67-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "98e7efb1b774e49a4424f88f5d3d4f2b6c66db5a",
+  "prompts": {
+    "c2cb3a4659487533": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019daeab-7ba0-7d70-8ae2-4f26d254398a",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Paul Falgout <paul.falgout@roundingwell.com>",
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_a485bfd2855000": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e00ee-0ee6-7f20-a7cf-aa210eb8244b",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Paul Falgout <paul.falgout@roundingwell.com>"
+    }
+  }
+}
