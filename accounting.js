@@ -3,8 +3,12 @@ const accountingWriter = require('./writer');
 const accountingPath = require('path');
 
 function handleAcctFile(file) {
-  if (!file.name.endsWith('.txt')) {
-    setErrorState('Unsupported accounting file', 'Upload a HanaBank text export ending in .txt.');
+  const normalizedName = file.name.toLowerCase();
+  const isHanaExport = normalizedName.endsWith('.txt');
+  const isNhExport = normalizedName.endsWith('.xls');
+
+  if (!isHanaExport && !isNhExport) {
+    setErrorState('Unsupported accounting file', 'Upload a HanaBank .txt export or Nonghyup .xls export.');
     return;
   }
 
@@ -13,8 +17,12 @@ function handleAcctFile(file) {
 
   reader.onload = async(event) => {
     try {
-      const data = await accountingConverter.processFile(event.target.result);
-      const outputPath = await accountingWriter.writeFile('accounting', 'ofx', data);
+      const data = isNhExport
+        ? await accountingConverter.processNhFile(Buffer.from(event.target.result))
+        : await accountingConverter.processFile(event.target.result);
+      const outputName = isNhExport ? 'accounting-NH' : 'accounting-HANA';
+      const outputPath = await accountingWriter.writeFile(outputName, 'ofx', data);
+      const sourceLabel = isNhExport ? 'Nonghyup source' : 'HanaBank source';
 
       setSuccessState({
         title: 'Accounting OFX generated',
@@ -22,7 +30,7 @@ function handleAcctFile(file) {
         outputPath,
         pills: [
           { label: 'OFX ready', icon: 'fa-file-waveform' },
-          { label: 'HanaBank source', icon: 'fa-building-columns' }
+          { label: sourceLabel, icon: 'fa-building-columns' }
         ]
       });
     } catch (error) {
@@ -30,7 +38,11 @@ function handleAcctFile(file) {
     }
   };
 
-  reader.readAsText(file);
+  if (isNhExport) {
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.readAsText(file);
+  }
 }
 
 function attachAccountingEventListeners() {
